@@ -1,0 +1,47 @@
+# --- Java / Maven ---
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+dependency-reduced-pom.xml
+
+# --- IDEs ---
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+nbproject/
+
+# --- Node / React (fase 4) ---
+node_modules/
+dist/
+build/
+.vite/
+*.local
+
+# --- Ambiente ---
+.env
+.env.*
+!.env.example
+
+# --- Estado local de ferramentas ---
+# Permissões e caminhos da máquina de quem desenvolve, não do projeto.
+.claude/
+
+# --- Logs e temporários ---
+*.log
+logs/
+tmp/
+*.pid
+
+# --- Sistema operacional ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Dados de containers (caso alguém use bind mount) ---
+.data/

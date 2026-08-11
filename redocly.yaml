@@ -1,0 +1,22 @@
+# Lint configuration for the OpenAPI contracts.
+#
+#   npx @redocly/cli lint contracts/openapi/order-service.yaml
+#   npx @redocly/cli preview-docs contracts/openapi/order-service.yaml
+#
+# Three rules are turned off deliberately - each with the reason, so nobody has to
+# guess later whether it was an oversight.
+
+extends:
+  - recommended
+
+rules:
+  # The API has no authentication yet. Declaring a bearerAuth scheme that no code
+  # enforces would make the contract lie. Turn this back on the moment auth is
+  # implemented - it is listed as a known debt in the README.
+  security-defined: off
+
+  # The only server today IS localhost: this runs locally by design.
+  no-server-example.com: off
+
+  # MIT with no license URL is fine for a portfolio repository.
+  info-license-strict: off
