@@ -38,4 +38,6 @@ public interface JpaOutboxRepository extends JpaRepository<OutboxMessageEntity, 
     List<OutboxMessageEntity> findDispatchable(@Param("now") Instant now, Pageable pageable);
 
     List<OutboxMessageEntity> findByAggregateIdOrderByCreatedAtAsc(UUID aggregateId);
+
+    long countByStatus(String status);
 }

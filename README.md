@@ -47,6 +47,8 @@ docker compose down -v
 | MongoDB | `localhost:27017` | `root` / `root` (app: `ticketflow` / `ticketflow`) |
 | Kafka | `localhost:9092` | — |
 | Kafka UI | http://localhost:8085 | — |
+| Prometheus | http://localhost:9091 | perfil `observability` |
+| Grafana | http://localhost:3002 | perfil `observability`, entra direto |
 
 > **Postgres está em 5433, não 5432.** A 5432 costuma já estar tomada por uma
 > instalação nativa de PostgreSQL na máquina. Dentro da rede Docker o serviço
@@ -200,6 +202,34 @@ http://localhost:8090/__admin/requests.
 
 ---
 
+## Observabilidade
+
+```bash
+docker compose --profile apps --profile observability up -d
+```
+
+Grafana em http://localhost:3002 já sobe com o datasource e o dashboard
+**TicketFlow — visão geral** provisionados. Sem login, sem clicar em nada.
+
+O dashboard responde a perguntas que só existem porque o sistema é assíncrono:
+
+- **Backlog do outbox** — o número mais útil do sistema. Se `PENDING` sobe, o relay
+  parou ou o broker sumiu, e a API continua respondendo `202` alegremente enquanto
+  ninguém a jusante fica sabendo. É uma falha invisível pela API.
+- **Resultado das cobranças** — aprovado e recusado são respostas do gateway;
+  `TIMEOUT` e `ERROR` não são, e são o par que sobe primeiro quando o provedor
+  começa a falhar.
+- **Latência do gateway** — o `read-timeout` é 5s; quando o p99 encosta nele, os
+  timeouts começam.
+- **Latência do `POST /orders`** — tem que ser baixa justamente porque não espera o
+  pagamento. Se subir, a premissa do projeto está sendo violada em algum lugar.
+
+As métricas de negócio são registradas na infraestrutura, nunca nos casos de uso —
+`OutboxMetrics` e o timer no cliente do gateway. O domínio não sabe que Prometheus
+existe.
+
+---
+
 ## Payment Service
 
 Um worker sem API pública. Consome `ORDER_CREATED`, cobra pelo gateway externo e
@@ -275,8 +305,8 @@ compilação anularia boa parte do sentido de separá-los em tempo de execução
 
 ### Fase 3 — Observabilidade e nuvem
 
-- [ ] Actuator + Micrometer + OpenTelemetry
-- [ ] Prometheus e Grafana no compose, com dashboard
+- [x] Actuator + Micrometer nos três serviços, com métricas de negócio
+- [x] Prometheus e Grafana no compose, com dashboard provisionado
 - [ ] Manifestos Kubernetes (Deployment + Service por microsserviço)
 - [ ] LocalStack para simular AWS
 

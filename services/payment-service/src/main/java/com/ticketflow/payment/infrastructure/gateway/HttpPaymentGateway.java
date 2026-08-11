@@ -3,6 +3,8 @@ package com.ticketflow.payment.infrastructure.gateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow.payment.application.port.out.PaymentGateway;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
@@ -13,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Talks to the external payment provider over HTTP.
@@ -28,15 +31,42 @@ public class HttpPaymentGateway implements PaymentGateway {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry registry;
 
-    public HttpPaymentGateway(RestClient restClient, ObjectMapper objectMapper) {
+    public HttpPaymentGateway(RestClient restClient, ObjectMapper objectMapper, MeterRegistry registry) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
+        this.registry = registry;
     }
 
     @Override
     public AuthorizationResponse authorize(AuthorizationRequest request) {
         long startedAt = System.nanoTime();
+        try {
+            return record(doAuthorize(request, startedAt), startedAt);
+        } catch (RuntimeException e) {
+            // Should not happen - doAuthorize converts failures into responses - but
+            // a metric that lies is worse than no metric.
+            record(AuthorizationResponse.errored(rootMessage(e), null, elapsedMs(startedAt), null), startedAt);
+            throw e;
+        }
+    }
+
+    /**
+     * One timer, tagged by outcome. Approval rate, decline rate and how long the
+     * provider takes all come from the same series - and a rise in TIMEOUT is
+     * visible before customers start complaining.
+     */
+    private AuthorizationResponse record(AuthorizationResponse response, long startedAt) {
+        Timer.builder("ticketflow.payment.gateway.calls")
+                .description("Calls to the external payment provider")
+                .tag("outcome", response.outcome().name())
+                .register(registry)
+                .record(System.nanoTime() - startedAt, TimeUnit.NANOSECONDS);
+        return response;
+    }
+
+    private AuthorizationResponse doAuthorize(AuthorizationRequest request, long startedAt) {
         try {
             ResponseEntity<String> response = restClient.post()
                     .uri(request.path())

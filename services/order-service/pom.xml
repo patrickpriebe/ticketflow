@@ -62,6 +62,17 @@
         </dependency>
 
         <!--
+            Exposes /actuator/prometheus. Micrometer is the facade the code writes
+            against; this registry renders those metrics in the format Prometheus
+            scrapes, so nothing in the application couples to Prometheus itself.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
             Kafka through Spring Cloud Stream: the outbox relay publishes with
             StreamBridge and the payment result arrives as a functional Consumer
             bean. The binder keeps the broker's details out of the code.

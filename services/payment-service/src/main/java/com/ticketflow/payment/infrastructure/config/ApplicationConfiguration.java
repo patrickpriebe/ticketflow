@@ -65,8 +65,10 @@ public class ApplicationConfiguration {
     }
 
     @Bean
-    public PaymentGateway paymentGateway(RestClient gatewayRestClient, ObjectMapper objectMapper) {
-        return new HttpPaymentGateway(gatewayRestClient, objectMapper);
+    public PaymentGateway paymentGateway(RestClient gatewayRestClient,
+                                         ObjectMapper objectMapper,
+                                         io.micrometer.core.instrument.MeterRegistry registry) {
+        return new HttpPaymentGateway(gatewayRestClient, objectMapper, registry);
     }
 
     @Bean

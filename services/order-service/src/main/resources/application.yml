@@ -67,11 +67,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  metrics:
+    tags:
+      # Stamped on every metric, so one Grafana panel can break a number down by
+      # service without needing three separate queries.
+      application: ${spring.application.name}
+  observations:
+    key-values:
+      application: ${spring.application.name}
 
 springdoc:
   # Contract-first: Swagger UI serves the hand-written document copied from

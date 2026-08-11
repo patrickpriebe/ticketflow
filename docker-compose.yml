@@ -303,10 +303,61 @@ services:
       start_period: 40s
     networks: [ticketflow]
 
+  # ---------------------------------------------------------------------------
+  # Observabilidade. Perfil proprio: nem sempre se quer subir tudo, e a stack de
+  # metricas nao e requisito para rodar o sistema.
+  #
+  #   docker compose --profile apps --profile observability up -d
+  # ---------------------------------------------------------------------------
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.1.0
+    container_name: ticketflow-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=24h
+      - --web.enable-lifecycle
+    ports:
+      # 9091 no host: a 9090 costuma ja estar ocupada por outro Prometheus.
+      # Dentro da rede o Grafana continua falando com prometheus:9090.
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [ticketflow]
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:11.5.1
+    container_name: ticketflow-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      # Ambiente local: login anonimo como admin evita uma tela de senha entre
+      # voce e o dashboard. Nunca faca isso em nada exposto.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: light
+    ports:
+      # 3002 no host: 3000 e 3001 costumam estar ocupadas por outro Grafana ou por
+      # um dev server de frontend. Dentro do container e sempre 3000.
+      - "${GRAFANA_PORT:-3002}:3000"
+    volumes:
+      # Datasource e dashboard provisionados: sobe pronto, sem clicar em nada.
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [ticketflow]
+
 volumes:
   postgres-data:
   mongo-data:
   kafka-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   ticketflow:

@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.ticketflow.payment.application.port.out.PaymentGateway.AuthorizationRequest;
 import com.ticketflow.payment.application.port.out.PaymentGateway.AuthorizationResponse;
 import com.ticketflow.payment.domain.model.AttemptOutcome;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +68,7 @@ class HttpPaymentGatewayTest {
                 .requestFactory(factory)
                 .build();
 
-        gateway = new HttpPaymentGateway(restClient, new ObjectMapper());
+        gateway = new HttpPaymentGateway(restClient, new ObjectMapper(), new SimpleMeterRegistry());
     }
 
     private AuthorizationRequest request() {
@@ -169,7 +170,7 @@ class HttpPaymentGatewayTest {
                 // Nothing listens here.
                 .baseUrl("http://localhost:1")
                 .build();
-        HttpPaymentGateway broken = new HttpPaymentGateway(unreachable, new ObjectMapper());
+        HttpPaymentGateway broken = new HttpPaymentGateway(unreachable, new ObjectMapper(), new SimpleMeterRegistry());
 
         AuthorizationResponse response = broken.authorize(request());
 
