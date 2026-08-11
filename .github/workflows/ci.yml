@@ -1,0 +1,101 @@
+name: CI
+
+# Roda em push na main e em qualquer pull request. Não roda em tag ou agendado:
+# este pipeline responde a uma pergunta só — "esse commit quebrou algo?".
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um push novo cancela o build anterior do mesmo branch. Não faz sentido gastar
+# runner testando um commit que já foi substituído.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  services:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Um serviço quebrado não deve esconder o resultado dos outros.
+      fail-fast: false
+      matrix:
+        service: [order-service, payment-service, notification-service]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          # Cacheia ~/.m2 por serviço, com chave derivada do pom.
+          cache: maven
+
+      - name: Testes e empacotamento
+        working-directory: services/${{ matrix.service }}
+        # No Linux o Testcontainers funciona, então os *IT sobem Postgres de
+        # verdade sem a escotilha que a máquina de desenvolvimento precisa.
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Publicar relatórios de teste
+        # Sobe mesmo com o build vermelho: é justamente quando o relatório importa.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.service }}
+          path: |
+            services/${{ matrix.service }}/target/surefire-reports/
+            services/${{ matrix.service }}/target/failsafe-reports/
+          retention-days: 7
+
+  contracts:
+    name: contratos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint do OpenAPI
+        run: npx --yes @redocly/cli@latest lint contracts/openapi/order-service.yaml
+
+      - name: JSON Schemas dos eventos parseiam
+        run: |
+          for f in contracts/events/*.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1
+            echo "ok $f"
+          done
+
+  images:
+    name: imagens docker
+    runs-on: ubuntu-latest
+    # Só constrói imagem se os testes passaram. Imagem de código quebrado não
+    # deveria nem existir.
+    needs: [services, contracts]
+    strategy:
+      matrix:
+        service: [order-service, payment-service, notification-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          # Não empurra para registry: o repositório é público e não há registry
+          # configurado. O que importa aqui é provar que a imagem constrói.
+          push: false
+          tags: ticketflow/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

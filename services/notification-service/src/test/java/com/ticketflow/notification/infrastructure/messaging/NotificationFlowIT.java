@@ -13,6 +13,9 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MongoDBContainer;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -30,10 +33,7 @@ import static org.awaitility.Awaitility.await;
  * a silent consumer looks identical to a broken one from the outside. In here a
  * failure is a stack trace in seconds.
  */
-@SpringBootTest(properties = {
-        "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
-        "spring.data.mongodb.uri=${ticketflow.it.mongo.uri:mongodb://root:root@localhost:27017/ticketflow_notifications_it?authSource=admin}"
-})
+@SpringBootTest(properties = "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}")
 @EmbeddedKafka(partitions = 1, topics = {
         NotificationFlowIT.ORDERS_CREATED,
         NotificationFlowIT.ORDERS_DLQ,
@@ -46,6 +46,28 @@ class NotificationFlowIT {
     static final String ORDERS_DLQ = "ticketflow.orders.created.dlq";
     static final String PAYMENTS_PROCESSED = "ticketflow.payments.processed";
     static final String PAYMENTS_DLQ = "ticketflow.payments.processed.dlq";
+
+    /**
+     * MongoDB de verdade, via Testcontainers.
+     *
+     * <p>Na CI, em Linux, o Testcontainers funciona normalmente. Na máquina de
+     * desenvolvimento, onde o Docker não expõe a Engine API para clientes JVM,
+     * passe {@code -Dticketflow.it.mongo.uri=...} apontando para o Mongo do
+     * compose.
+     */
+    private static final MongoDBContainer MONGO = new MongoDBContainer("mongo:7");
+
+    @DynamicPropertySource
+    static void mongo(DynamicPropertyRegistry registry) {
+        String external = System.getProperty("ticketflow.it.mongo.uri");
+        if (external != null && !external.isBlank()) {
+            registry.add("spring.data.mongodb.uri", () -> external);
+            return;
+        }
+        MONGO.start();
+        registry.add("spring.data.mongodb.uri",
+                () -> MONGO.getReplicaSetUrl("ticketflow_notifications_it"));
+    }
 
     @Autowired
     private EmbeddedKafkaBroker broker;

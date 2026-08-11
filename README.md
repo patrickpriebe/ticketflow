@@ -1,5 +1,7 @@
 # TicketFlow
 
+[![CI](https://github.com/patrickpriebe/ticketflow/actions/workflows/ci.yml/badge.svg)](https://github.com/patrickpriebe/ticketflow/actions/workflows/ci.yml)
+
 Sistema distribuído de venda de ingressos: três microsserviços Spring Boot que
 conversam só por eventos, dois bancos com papéis diferentes, e infraestrutura que
 sobe inteira com um comando.
@@ -312,7 +314,7 @@ compilação anularia boa parte do sentido de separá-los em tempo de execução
 
 ### Fase 4 — CI/CD e frontend
 
-- [ ] Pipeline: build Maven, testes, imagem Docker
+- [x] Pipeline: build Maven, testes, lint dos contratos, imagem Docker
 - [ ] Telas React: lista de eventos e status do pedido em tempo real
 
 ---
