@@ -36,7 +36,8 @@ public class NotificationServiceApplication {
                                                    Repositories.Tickets tickets,
                                                    Repositories.Notifications notifications,
                                                    Repositories.ProcessedEvents processedEvents,
+                                                   com.ticketflow.notification.application.port.out.TicketArchive archive,
                                                    Clock clock) {
-        return new HandlePaymentResult(snapshots, tickets, notifications, processedEvents, clock);
+        return new HandlePaymentResult(snapshots, tickets, notifications, processedEvents, archive, clock);
     }
 }

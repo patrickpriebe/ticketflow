@@ -54,6 +54,15 @@ spring:
               enable-dlq: true
               dlq-name: ticketflow.payments.processed.dlq
 
+ticketflow:
+  archive:
+    # Desligado por padrão: o serviço tem que rodar sem AWS nenhuma, e ninguém
+    # deveria precisar do LocalStack de pé só para ver um pedido passar.
+    enabled: false
+    bucket: ticketflow-tickets
+    endpoint: ""
+    region: us-east-1
+
 server:
   port: 8083
 
@@ -95,3 +104,10 @@ spring:
       uri: mongodb://ticketflow:ticketflow@mongo:27017/ticketflow_notifications
   kafka:
     bootstrap-servers: kafka:19092
+
+ticketflow:
+  archive:
+    # No compose o LocalStack faz o papel da AWS.
+    enabled: ${TICKETFLOW_ARCHIVE_ENABLED:false}
+    endpoint: http://localstack:4566
+    bucket: ticketflow-tickets

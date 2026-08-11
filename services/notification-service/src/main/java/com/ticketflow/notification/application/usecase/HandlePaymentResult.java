@@ -1,6 +1,7 @@
 package com.ticketflow.notification.application.usecase;
 
 import com.ticketflow.notification.application.port.out.Repositories;
+import com.ticketflow.notification.application.port.out.TicketArchive;
 import com.ticketflow.notification.domain.model.Notification;
 import com.ticketflow.notification.domain.model.OrderSnapshot;
 import com.ticketflow.notification.domain.model.Ticket;
@@ -33,17 +34,20 @@ public class HandlePaymentResult {
     private final Repositories.Tickets tickets;
     private final Repositories.Notifications notifications;
     private final Repositories.ProcessedEvents processedEvents;
+    private final TicketArchive archive;
     private final Clock clock;
 
     public HandlePaymentResult(Repositories.OrderSnapshots snapshots,
                                Repositories.Tickets tickets,
                                Repositories.Notifications notifications,
                                Repositories.ProcessedEvents processedEvents,
+                               TicketArchive archive,
                                Clock clock) {
         this.snapshots = Objects.requireNonNull(snapshots);
         this.tickets = Objects.requireNonNull(tickets);
         this.notifications = Objects.requireNonNull(notifications);
         this.processedEvents = Objects.requireNonNull(processedEvents);
+        this.archive = Objects.requireNonNull(archive);
         this.clock = Objects.requireNonNull(clock);
     }
 
@@ -67,7 +71,11 @@ public class HandlePaymentResult {
         Result result;
 
         if (command.approved()) {
-            List<Ticket> issued = issueTickets(snapshot, now);
+            List<Ticket> issued = issueTickets(snapshot, now).stream()
+                    // Archiving never throws and never blocks: a ticket that was
+                    // paid for is valid whether or not the durable copy landed.
+                    .map(ticket -> ticket.withArchiveLocation(archive.archive(ticket)))
+                    .toList();
             tickets.saveAll(issued);
             notifications.save(Notification.ticketsIssued(
                     snapshot.orderId(), snapshot.customerId(), snapshot.customerEmail(),

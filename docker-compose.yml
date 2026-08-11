@@ -293,6 +293,8 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # Só arquiva no S3 se o LocalStack estiver de pé (perfil `aws`).
+      TICKETFLOW_ARCHIVE_ENABLED: ${TICKETFLOW_ARCHIVE_ENABLED:-false}
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-8083}:8083"
     healthcheck:
@@ -301,6 +303,34 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+    networks: [ticketflow]
+
+  # ---------------------------------------------------------------------------
+  # LocalStack faz o papel da AWS. Aqui so o S3, para arquivar o ingresso
+  # emitido - escrito uma vez, lido raramente, e precisa sobreviver a um restore
+  # do banco feito antes do ingresso existir.
+  #
+  # Perfil proprio: o Notification Service roda perfeitamente sem nada disso.
+  # ---------------------------------------------------------------------------
+  localstack:
+    profiles: [aws]
+    image: localstack/localstack:4.0
+    container_name: ticketflow-localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: s3
+      DEBUG: "0"
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    volumes:
+      - ./infra/localstack/init:/etc/localstack/init/ready.d:ro
+      - localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks: [ticketflow]
 
   # ---------------------------------------------------------------------------
@@ -358,6 +388,7 @@ volumes:
   kafka-data:
   prometheus-data:
   grafana-data:
+  localstack-data:
 
 networks:
   ticketflow:

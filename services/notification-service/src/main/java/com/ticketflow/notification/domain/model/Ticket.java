@@ -28,7 +28,14 @@ public record Ticket(String id,
                      Holder holder,
                      String qrCodePayload,
                      TicketStatus status,
-                     Instant issuedAt) {
+                     Instant issuedAt,
+                     String archiveLocation) {
+
+    /** Same ticket, now knowing where its durable copy lives. */
+    public Ticket withArchiveLocation(String location) {
+        return new Ticket(id, ticketCode, orderId, eventId, eventSnapshot, ticketCategory,
+                holder, qrCodePayload, status, issuedAt, location);
+    }
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -66,7 +73,8 @@ public record Ticket(String id,
                 // Stands in for a real QR payload; a production one would be signed.
                 "TF|" + id,
                 TicketStatus.ISSUED,
-                issuedAt);
+                issuedAt,
+                null);
     }
 
     /**

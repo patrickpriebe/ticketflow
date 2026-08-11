@@ -50,7 +50,11 @@ class HandlePaymentResultTest {
     @BeforeEach
     void setUp() {
         handlePaymentResult = new HandlePaymentResult(
-                snapshots, tickets, notifications, processedEvents, Clock.fixed(NOW, ZoneOffset.UTC));
+                snapshots, tickets, notifications, processedEvents,
+                // Um arquivo fake que sempre "funciona", para provar que a
+                // localização volta gravada no ingresso.
+                ticket -> "s3://ticketflow-tickets/tickets/" + ticket.orderId() + "/" + ticket.id() + ".json",
+                Clock.fixed(NOW, ZoneOffset.UTC));
         orderId = UUID.randomUUID().toString();
         eventId = UUID.randomUUID().toString();
     }
@@ -112,6 +116,21 @@ class HandlePaymentResultTest {
 
         assertThat(firstIds).isEqualTo(recomputed);
         assertThat(firstIds).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("keeps where each ticket was archived")
+    void recordsArchiveLocation() {
+        givenSnapshot(2, 0);
+
+        handlePaymentResult.execute(approved());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Ticket>> issued = ArgumentCaptor.forClass(List.class);
+        verify(tickets).saveAll(issued.capture());
+        // A ausência dessa localização é o que um job de backfill procuraria.
+        assertThat(issued.getValue()).allSatisfy(ticket ->
+                assertThat(ticket.archiveLocation()).startsWith("s3://ticketflow-tickets/tickets/"));
     }
 
     @Test

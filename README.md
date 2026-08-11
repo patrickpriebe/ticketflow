@@ -308,7 +308,7 @@ compilação anularia boa parte do sentido de separá-los em tempo de execução
 - [x] Actuator + Micrometer nos três serviços, com métricas de negócio
 - [x] Prometheus e Grafana no compose, com dashboard provisionado
 - [x] Manifestos Kubernetes (Deployment + Service por microsserviço)
-- [ ] LocalStack para simular AWS
+- [x] LocalStack com S3 arquivando os ingressos emitidos
 
 ### Fase 4 — CI/CD e frontend
 
