@@ -274,6 +274,35 @@ services:
       start_period: 40s
     networks: [ticketflow]
 
+  # ---------------------------------------------------------------------------
+  # Notification Service. Consumes both topics - ORDER_CREATED to know what was
+  # bought, the payment result to know whether to print it - and publishes
+  # nothing, so it needs no outbox.
+  # ---------------------------------------------------------------------------
+  notification-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: ticketflow-notification-service
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8083}:8083"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [ticketflow]
+
 volumes:
   postgres-data:
   mongo-data:

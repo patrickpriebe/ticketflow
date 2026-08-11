@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: notification-service
+
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://ticketflow:ticketflow@localhost:27017/ticketflow_notifications}
+      auto-index-creation: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+  cloud:
+    function:
+      # Two consumers: one builds the read model, the other acts on it.
+      definition: orderCreated;paymentProcessed
+    stream:
+      bindings:
+        orderCreated-in-0:
+          destination: ticketflow.orders.created
+          group: notification-service
+          consumer:
+            max-attempts: 3
+        paymentProcessed-in-0:
+          destination: ticketflow.payments.processed
+          group: notification-service
+          consumer:
+            # A payment result can arrive before its order snapshot has been stored.
+            # The partition key guarantees ordering *within* a topic, not across two
+            # of them - these are separate topics read by separate consumers, so
+            # nothing orders them relative to each other. In steady state the gap is
+            # milliseconds; on a cold start replaying both topics it can be seconds,
+            # which is what this retry window is sized for.
+            max-attempts: 10
+            back-off-initial-interval: 2000
+            back-off-max-interval: 10000
+      kafka:
+        binder:
+          brokers: ${spring.kafka.bootstrap-servers}
+          auto-create-topics: false
+        bindings:
+          orderCreated-in-0:
+            consumer:
+              enable-dlq: true
+              dlq-name: ticketflow.orders.created.dlq
+          paymentProcessed-in-0:
+            consumer:
+              enable-dlq: true
+              dlq-name: ticketflow.payments.processed.dlq
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  data:
+    mongodb:
+      uri: mongodb://ticketflow:ticketflow@mongo:27017/ticketflow_notifications
+  kafka:
+    bootstrap-servers: kafka:19092

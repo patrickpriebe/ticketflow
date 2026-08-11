@@ -44,12 +44,18 @@ notificationsDb.createCollection('tickets', {
                 eventId: { bsonType: 'string' },
                 eventSnapshot: {
                     bsonType: 'object',
-                    required: ['name', 'venue', 'startsAt'],
+                    // Only the name is required. ORDER_CREATED carries the event's
+                    // name but not its venue or date, and this service will not ask
+                    // the Order Service for them - a synchronous call between
+                    // services is exactly what the architecture forbids. Enriching
+                    // the contract is the honest fix if a ticket ever needs to print
+                    // the venue.
+                    required: ['name'],
                     properties: {
                         name: { bsonType: 'string' },
-                        venue: { bsonType: 'string' },
-                        city: { bsonType: 'string' },
-                        startsAt: { bsonType: 'date' }
+                        venue: { bsonType: ['string', 'null'] },
+                        city: { bsonType: ['string', 'null'] },
+                        startsAt: { bsonType: ['date', 'null'] }
                     }
                 },
                 ticketCategory: {
@@ -118,6 +124,50 @@ notificationsDb.createCollection('notifications', {
 
 notificationsDb.notifications.createIndex({ orderId: 1, createdAt: -1 }, { name: 'ix_notifications_order' });
 notificationsDb.notifications.createIndex({ status: 1, createdAt: 1 }, { name: 'ix_notifications_pending' });
+
+// -----------------------------------------------------------------------------
+// order_snapshots - this service's own read model.
+//
+// PAGAMENTO_APROVADO says how much was charged, never what was bought. Instead of
+// asking the Order Service - which would be a synchronous call between services,
+// the one thing this architecture forbids - the Notification Service listens to
+// ORDER_CREATED and keeps the little it needs to print a ticket.
+//
+// The _id is the orderId, so a redelivered ORDER_CREATED overwrites rather than
+// accumulating.
+// -----------------------------------------------------------------------------
+notificationsDb.createCollection('order_snapshots', {
+    validator: {
+        $jsonSchema: {
+            bsonType: 'object',
+            required: ['_id', 'customerEmail', 'items'],
+            additionalProperties: true,
+            properties: {
+                _id: { bsonType: 'string', description: 'the orderId' },
+                customerId: { bsonType: ['string', 'null'] },
+                customerName: { bsonType: ['string', 'null'] },
+                customerEmail: { bsonType: 'string' },
+                eventId: { bsonType: ['string', 'null'] },
+                eventName: { bsonType: ['string', 'null'] },
+                items: {
+                    bsonType: 'array',
+                    items: {
+                        bsonType: 'object',
+                        required: ['ticketCategoryId', 'quantity'],
+                        properties: {
+                            ticketCategoryId: { bsonType: 'string' },
+                            categoryName: { bsonType: ['string', 'null'] },
+                            quantity: { bsonType: 'int', minimum: 1 }
+                        }
+                    }
+                },
+                receivedAt: { bsonType: 'date' }
+            }
+        }
+    }
+});
+
+notificationsDb.order_snapshots.createIndex({ receivedAt: 1 }, { name: 'ix_order_snapshots_received' });
 
 // -----------------------------------------------------------------------------
 // processed_events - idempotent consumer, same role as the PostgreSQL inbox
