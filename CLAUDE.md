@@ -116,6 +116,10 @@ Os outros dois serviços devem copiar estas escolhas, não reinventá-las:
 - **Um arquivo por interface de repositório Spring Data.** Agrupar várias como
   interfaces aninhadas dentro de uma classe faz o scan não encontrá-las, e o erro só
   aparece no boot como "No qualifying bean".
+- **Dentro de `await().untilAsserted()`, nunca `jdbc.queryForObject`.** Ele lança
+  `EmptyResultDataAccessException` quando não há linha, e o Awaitility só repete em
+  `AssertionError` — a espera aborta na primeira tentativa e o sintoma engana, parece
+  que o consumidor nunca rodou. Usar `queryForList` e devolver null.
 - **Recusa (`REJECTED`) e falha (`FAILED`) são coisas diferentes** e o Payment
   Service depende disso: recusa publica `PAGAMENTO_RECUSADO`; timeout ou 5xx não
   publicam nada, não gravam no inbox e deixam a mensagem ser reentregue. Nunca

@@ -207,7 +207,7 @@ publica `PAGAMENTO_APROVADO` ou `PAGAMENTO_RECUSADO`. É o único serviço que f
 de saída — e só para o gateway.
 
 ```bash
-cd services/payment-service && ./mvnw test
+cd services/payment-service && ./mvnw verify
 ```
 
 Duas ideias sustentam o serviço:
