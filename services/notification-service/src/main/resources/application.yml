@@ -74,6 +74,18 @@ management:
       application: ${spring.application.name}
 
 ---
+# Kubernetes. Tudo vem do ConfigMap e do Secret.
+spring:
+  config:
+    activate:
+      on-profile: kubernetes
+  data:
+    mongodb:
+      uri: ${MONGO_URI}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+
+---
 spring:
   config:
     activate:

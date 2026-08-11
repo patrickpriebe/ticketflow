@@ -94,6 +94,24 @@ spring:
     password: ${POSTGRES_PASSWORD:ticketflow}
 
 ---
+# Kubernetes. Tudo vem do ConfigMap e do Secret, sem defaults: variável faltando
+# tem que quebrar o boot, não conectar em algo inesperado.
+spring:
+  config:
+    activate:
+      on-profile: kubernetes
+  datasource:
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+
+ticketflow:
+  gateway:
+    base-url: ${TICKETFLOW_GATEWAY_BASE_URL}
+
+---
 spring:
   config:
     activate:

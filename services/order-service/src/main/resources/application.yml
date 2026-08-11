@@ -127,6 +127,23 @@ spring:
     locations: classpath:db/migration,classpath:db/seed
 
 ---
+# Kubernetes. Everything comes from the ConfigMap and Secret - no defaults here on
+# purpose: a missing variable must fail loudly at boot, not silently connect to
+# something unintended.
+spring:
+  config:
+    activate:
+      on-profile: kubernetes
+  datasource:
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+  flyway:
+    locations: classpath:db/migration
+
+---
 # Running as a container inside the ticketflow compose network.
 spring:
   config:
