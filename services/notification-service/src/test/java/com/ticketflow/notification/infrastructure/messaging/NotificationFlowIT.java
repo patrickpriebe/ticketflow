@@ -164,6 +164,15 @@ class NotificationFlowIT {
         var ticket = findOne("tickets");
         assertThat(String.valueOf(ticket.get("ticketCode"))).matches("^TF-[A-Z0-9]{10}$");
         assertThat(ticket.get("status")).isEqualTo("ISSUED");
+
+        // The stored shape has to match what the collection validator demands. This
+        // test database has no validators, so without asserting it here a mapping
+        // change passes green and only fails against a real environment - which is
+        // exactly how the nested `id` -> `_id` promotion got through once already.
+        var category = (org.bson.Document) ticket.get("ticketCategory");
+        assertThat(category.keySet()).contains("categoryId", "name").doesNotContain("_id", "id");
+        var holder = (org.bson.Document) ticket.get("holder");
+        assertThat(holder.keySet()).contains("customerId", "email").doesNotContain("_id");
     }
 
     @Test

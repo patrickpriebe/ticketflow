@@ -60,11 +60,13 @@ notificationsDb.createCollection('tickets', {
                 },
                 ticketCategory: {
                     bsonType: 'object',
-                    required: ['id', 'name'],
+                    // categoryId, not id: Spring Data promotes a nested property
+                    // called `id` to `_id`, which would never satisfy this rule.
+                    required: ['categoryId', 'name'],
                     properties: {
-                        id: { bsonType: 'string' },
+                        categoryId: { bsonType: 'string' },
                         name: { bsonType: 'string' },
-                        price: { bsonType: 'decimal' }
+                        price: { bsonType: ['decimal', 'double', 'null'] }
                     }
                 },
                 holder: {

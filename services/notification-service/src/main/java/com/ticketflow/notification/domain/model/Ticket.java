@@ -54,7 +54,7 @@ public record Ticket(String id,
                                Holder holder,
                                int seat,
                                Instant issuedAt) {
-        String id = deterministicId(orderId, category.id(), seat);
+        String id = deterministicId(orderId, category.categoryId(), seat);
         return new Ticket(
                 id,
                 generateCode(),
@@ -91,7 +91,13 @@ public record Ticket(String id,
     public record EventSnapshot(String name, String venue, Instant startsAt) {
     }
 
-    public record TicketCategory(String id, String name) {
+    /**
+     * Named {@code categoryId} rather than {@code id} on purpose: Spring Data treats
+     * a property called {@code id} as an identifier even inside a nested document
+     * and writes it as {@code _id}, which silently broke the collection validator.
+     * It also reads better next to {@code holder.customerId}.
+     */
+    public record TicketCategory(String categoryId, String name) {
     }
 
     public record Holder(String customerId, String name, String email) {
