@@ -1,0 +1,453 @@
+openapi: 3.0.3
+
+info:
+  title: TicketFlow - Order Service API
+  version: 1.0.0
+  description: |
+    Public API of the TicketFlow Order Service: browse the event catalogue and
+    place ticket orders.
+
+    ## The one thing to understand about this API
+
+    `POST /orders` answers **202 Accepted**, not 201 Created. The order is
+    persisted as `PENDING` and an `ORDER_CREATED` event is published to Kafka in
+    the same database transaction (transactional outbox). Payment is processed
+    later, by a different service, and the order reaches `PAID` or `REJECTED`
+    asynchronously.
+
+    Clients must therefore **poll `GET /orders/{orderId}`** (or, from phase 4,
+    listen on the SSE stream) instead of expecting the final status in the
+    response body. An Order Service that blocked waiting for the payment would
+    defeat the entire architecture.
+
+    ## Idempotency
+
+    `POST /orders` requires an `Idempotency-Key` header. Replaying the same key
+    returns the original order with `200 OK` instead of creating a duplicate -
+    which is what makes a client retry after a network timeout safe.
+
+  contact:
+    name: TicketFlow
+    url: https://github.com/patrick/ticketflow
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Events
+    description: Event catalogue (read-only for the customer).
+  - name: Orders
+    description: Placing and tracking ticket orders.
+
+paths:
+
+  # ===========================================================================
+  # Events
+  # ===========================================================================
+  /api/v1/events:
+    get:
+      tags: [Events]
+      summary: List events available for sale
+      operationId: listEvents
+      parameters:
+        - name: city
+          in: query
+          description: Filter by city (exact match, case-insensitive).
+          schema: { type: string, example: São Paulo }
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/events/{eventId}:
+    get:
+      tags: [Events]
+      summary: Get one event with its ticket categories and availability
+      operationId: getEvent
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: The event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===========================================================================
+  # Orders
+  # ===========================================================================
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Place an order (accepted for asynchronous processing)
+      operationId: createOrder
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: |
+            Client-generated unique key (a UUID is fine). Retrying a request
+            with the same key returns the original order instead of charging
+            the customer twice.
+          schema: { type: string, minLength: 8, maxLength: 80 }
+          example: 8a1f0c2e-6b3d-4a91-9f77-1c2d3e4f5a6b
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '202':
+          description: |
+            Order accepted and queued. The body carries `status: PENDING`;
+            the final status arrives later.
+          headers:
+            Location:
+              description: URL to poll for the order status.
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '200':
+          description: |
+            The `Idempotency-Key` was already used. The original order is
+            returned unchanged; nothing new was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Event or ticket category does not exist.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: |
+            The order cannot be accepted in the catalogue's current state -
+            sales window closed, event cancelled, or not enough tickets left.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                soldOut:
+                  value:
+                    type: https://ticketflow.dev/problems/insufficient-inventory
+                    title: Insufficient inventory
+                    status: 409
+                    detail: Ticket category 'Camarote' has only 2 tickets left, 4 were requested.
+                    instance: /api/v1/orders
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    get:
+      tags: [Orders]
+      summary: List a customer's orders
+      operationId: listOrders
+      parameters:
+        - name: customerId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/OrderStatus' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Page of orders.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Get an order and its status timeline
+      description: |
+        This is the endpoint a client polls after `POST /orders`. The
+        `statusHistory` array is what the front-end renders as a progress
+        timeline.
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: Request is well-formed but fails validation.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    # -- Shared ---------------------------------------------------------------
+
+    Problem:
+      type: object
+      description: RFC 7807 problem details.
+      properties:
+        type:    { type: string, format: uri, example: 'https://ticketflow.dev/problems/validation-error' }
+        title:   { type: string, example: Validation failed }
+        status:  { type: integer, example: 422 }
+        detail:  { type: string, example: 'items[0].quantity must be between 1 and 10' }
+        instance: { type: string, example: /api/v1/orders }
+        traceId: { type: string, description: 'Correlation id, also present on the Kafka events.' }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:   { type: string }
+              message: { type: string }
+      required: [type, title, status]
+
+    Money:
+      type: object
+      properties:
+        amount:   { type: number, format: double, example: 650.00 }
+        currency: { type: string, minLength: 3, maxLength: 3, example: BRL }
+      required: [amount, currency]
+
+    PageMeta:
+      type: object
+      properties:
+        page:          { type: integer, example: 0 }
+        size:          { type: integer, example: 20 }
+        totalElements: { type: integer, format: int64, example: 137 }
+        totalPages:    { type: integer, example: 7 }
+      required: [page, size, totalElements, totalPages]
+
+    # -- Events ---------------------------------------------------------------
+
+    EventStatus:
+      type: string
+      enum: [DRAFT, ON_SALE, SOLD_OUT, CANCELLED, FINISHED]
+
+    EventSummary:
+      type: object
+      properties:
+        id:          { type: string, format: uuid }
+        name:        { type: string, example: 'Rock in Rio 2026 - Dia 1' }
+        venue:       { type: string, example: Parque Olímpico }
+        city:        { type: string, example: Rio de Janeiro }
+        startsAt:    { type: string, format: date-time }
+        status:      { $ref: '#/components/schemas/EventStatus' }
+        priceFrom:   { $ref: '#/components/schemas/Money' }
+      required: [id, name, venue, city, startsAt, status]
+
+    EventDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+        - type: object
+          properties:
+            description:  { type: string }
+            salesStartAt: { type: string, format: date-time }
+            salesEndAt:   { type: string, format: date-time }
+            categories:
+              type: array
+              items: { $ref: '#/components/schemas/TicketCategory' }
+          required: [categories]
+
+    TicketCategory:
+      type: object
+      properties:
+        id:                { type: string, format: uuid }
+        name:              { type: string, example: Pista }
+        price:             { $ref: '#/components/schemas/Money' }
+        availableQuantity: { type: integer, example: 4820 }
+      required: [id, name, price, availableQuantity]
+
+    EventPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/EventSummary' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+      required: [content, page]
+
+    # -- Orders ---------------------------------------------------------------
+
+    OrderStatus:
+      type: string
+      description: |
+        `PENDING` is the only status `POST /orders` can return. Everything else
+        is reached asynchronously, driven by the payment result consumed from
+        Kafka.
+      enum: [PENDING, PAID, REJECTED, CANCELLED, EXPIRED]
+
+    PaymentMethod:
+      type: string
+      enum: [CREDIT_CARD, PIX, BOLETO]
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        customer:
+          type: object
+          properties:
+            id:    { type: string, format: uuid }
+            name:  { type: string, minLength: 2, maxLength: 180 }
+            email: { type: string, format: email }
+          required: [id, name, email]
+        eventId:       { type: string, format: uuid }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            properties:
+              ticketCategoryId: { type: string, format: uuid }
+              quantity:         { type: integer, minimum: 1, maximum: 10 }
+            required: [ticketCategoryId, quantity]
+      required: [customer, eventId, paymentMethod, items]
+      example:
+        customer:
+          id: 3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10
+          name: Ana Souza
+          email: ana.souza@example.com
+        eventId: 11111111-1111-4111-8111-111111111111
+        paymentMethod: CREDIT_CARD
+        items:
+          - ticketCategoryId: aaaaaaaa-0001-4000-8000-000000000001
+            quantity: 2
+
+    OrderItemResponse:
+      type: object
+      properties:
+        ticketCategoryId: { type: string, format: uuid }
+        categoryName:     { type: string, example: Pista }
+        quantity:         { type: integer, example: 2 }
+        unitPrice:        { $ref: '#/components/schemas/Money' }
+        subtotal:         { $ref: '#/components/schemas/Money' }
+      required: [ticketCategoryId, categoryName, quantity, unitPrice, subtotal]
+
+    OrderStatusChange:
+      type: object
+      properties:
+        fromStatus: { $ref: '#/components/schemas/OrderStatus' }
+        toStatus:   { $ref: '#/components/schemas/OrderStatus' }
+        reason:     { type: string, example: 'Card declined by issuer (insufficient funds)' }
+        occurredAt: { type: string, format: date-time }
+      required: [toStatus, occurredAt]
+
+    OrderResponse:
+      type: object
+      properties:
+        id:     { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        customer:
+          type: object
+          properties:
+            id:    { type: string, format: uuid }
+            name:  { type: string }
+            email: { type: string, format: email }
+        event:
+          $ref: '#/components/schemas/EventSummary'
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItemResponse' }
+        totalAmount: { $ref: '#/components/schemas/Money' }
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/OrderStatusChange' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, status, items, totalAmount, createdAt]
+      example:
+        id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+        status: PENDING
+        customer:
+          id: 3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10
+          name: Ana Souza
+          email: ana.souza@example.com
+        paymentMethod: CREDIT_CARD
+        items:
+          - ticketCategoryId: aaaaaaaa-0001-4000-8000-000000000001
+            categoryName: Pista
+            quantity: 2
+            unitPrice: { amount: 650.00, currency: BRL }
+            subtotal:  { amount: 1300.00, currency: BRL }
+        totalAmount: { amount: 1300.00, currency: BRL }
+        statusHistory:
+          - toStatus: PENDING
+            occurredAt: '2026-08-10T14:03:21Z'
+        createdAt: '2026-08-10T14:03:21Z'
+
+    OrderPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/OrderResponse' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+      required: [content, page]

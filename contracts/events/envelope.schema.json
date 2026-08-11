@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ticketflow.dev/schemas/events/envelope.json",
+  "title": "TicketFlow event envelope",
+  "description": "Every message on every TicketFlow topic uses this envelope. Consumers can therefore route, deduplicate and trace a message without knowing anything about its payload. The Kafka record key is always the orderId, so all events about one order land on the same partition and stay ordered.",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "producer", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique per message. This is the deduplication key stored in the consumers' processed_events table/collection."
+    },
+    "eventType": {
+      "type": "string",
+      "description": "Discriminator. Determines the shape of `data`.",
+      "enum": ["ORDER_CREATED", "PAGAMENTO_APROVADO", "PAGAMENTO_RECUSADO"]
+    },
+    "eventVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version of `data`. Bump it for breaking changes and keep consumers reading both versions during the migration."
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the fact happened in the producing service - not when it was published."
+    },
+    "producer": {
+      "type": "string",
+      "enum": ["order-service", "payment-service", "notification-service"]
+    },
+    "traceId": {
+      "type": "string",
+      "description": "OpenTelemetry trace id, propagated end to end so one purchase is a single trace across all three services (phase 3)."
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Business correlation, normally the orderId. Handy when reading raw messages in Kafka UI."
+    },
+    "data": {
+      "type": "object",
+      "description": "Event-specific payload."
+    }
+  }
+}
