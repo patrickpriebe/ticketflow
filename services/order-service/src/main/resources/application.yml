@@ -1,0 +1,130 @@
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: order-service-pool
+      maximum-pool-size: 10
+
+  jpa:
+    # Flyway owns the schema. `validate` makes the application refuse to start if
+    # the entities and the migrations ever disagree - far better than `update`
+    # quietly altering tables behind your back.
+    hibernate:
+      ddl-auto: validate
+    # Lazy loading must not silently happen while rendering the HTTP response.
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  cloud:
+    function:
+      # Only the consumer is declared. The producer side goes through StreamBridge,
+      # because the relay sends when it has something to send.
+      definition: paymentProcessed
+    stream:
+      bindings:
+        orderCreated-out-0:
+          destination: ticketflow.orders.created
+        paymentProcessed-in-0:
+          destination: ticketflow.payments.processed
+          # The consumer group is also the inbox key in processed_events.
+          group: order-service
+          consumer:
+            max-attempts: 3
+            back-off-initial-interval: 1000
+      kafka:
+        binder:
+          brokers: ${spring.kafka.bootstrap-servers}
+          # Topics are infrastructure, created by infra/kafka/create-topics.sh.
+          # A topic appearing by accident hides a typo instead of exposing it.
+          auto-create-topics: false
+          required-acks: all
+        bindings:
+          paymentProcessed-in-0:
+            consumer:
+              # A message that will never parse must not be retried forever.
+              enable-dlq: true
+              dlq-name: ticketflow.payments.processed.dlq
+
+server:
+  port: 8080
+  error:
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  # Contract-first: Swagger UI serves the hand-written document copied from
+  # contracts/openapi at build time. Nothing is generated from annotations, so
+  # the published contract cannot drift away from the designed one.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /order-service.yaml
+
+ticketflow:
+  order:
+    # How long an order may sit in PENDING before an expiry job may cancel it.
+    payment-window: PT15M
+  outbox:
+    # Milliseconds between relay cycles.
+    poll-interval: 1000
+    batch-size: 50
+    # After this many failed sends the message is parked as FAILED for inspection.
+    max-attempts: 8
+    output-binding: orderCreated-out-0
+
+---
+# Running from the IDE / `mvnw spring-boot:run` on Windows.
+# Postgres is published on 5433 because 5432 is taken by a native install.
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5433/ticketflow_orders}
+    # Overridable by environment. The fallbacks are the throwaway credentials from
+    # .env.example - never commit a real one here.
+    username: ${POSTGRES_USER:ticketflow}
+    password: ${POSTGRES_PASSWORD:ticketflow}
+  flyway:
+    # The demo catalogue is applied only here. It is deliberately outside the
+    # default locations so it can never reach a real environment.
+    locations: classpath:db/migration,classpath:db/seed
+
+---
+# Running as a container inside the ticketflow compose network.
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://postgres:5432/ticketflow_orders
+    username: ${POSTGRES_USER:ticketflow}
+    password: ${POSTGRES_PASSWORD:ticketflow}
+  kafka:
+    # Inside the compose network the broker's internal listener is used.
+    bootstrap-servers: kafka:19092
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
