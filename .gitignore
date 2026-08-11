@@ -45,3 +45,7 @@ Desktop.ini
 
 # --- Dados de containers (caso alguém use bind mount) ---
 .data/
+
+# --- Frontend ---
+frontend/dist/
+frontend/node_modules/
