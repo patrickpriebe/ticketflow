@@ -41,10 +41,16 @@ spring:
         bindings:
           orderCreated-in-0:
             consumer:
+              # Explicit, not inherited: a group joining without a committed offset
+              # would otherwise start at the end and silently skip everything already
+              # on the topic. For a service that issues tickets, a missed event is a
+              # customer who paid and got nothing.
+              start-offset: earliest
               enable-dlq: true
               dlq-name: ticketflow.orders.created.dlq
           paymentProcessed-in-0:
             consumer:
+              start-offset: earliest
               enable-dlq: true
               dlq-name: ticketflow.payments.processed.dlq
 

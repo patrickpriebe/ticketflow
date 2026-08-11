@@ -15,8 +15,14 @@ import java.util.Objects;
  *
  * <p>Classic CQRS: the write side owns orders, this side owns a projection shaped
  * for what it has to do, which is print tickets.
+ *
+ * <p>{@code orderId} is annotated as the identifier so it becomes the document's
+ * {@code _id}. Without that, Spring Data only promotes a property literally named
+ * {@code id}, and every redelivered ORDER_CREATED would insert another copy under a
+ * generated ObjectId instead of overwriting - which is exactly what happened before
+ * the annotation was added.
  */
-public record OrderSnapshot(String orderId,
+public record OrderSnapshot(@org.springframework.data.annotation.Id String orderId,
                             String customerId,
                             String customerName,
                             String customerEmail,
