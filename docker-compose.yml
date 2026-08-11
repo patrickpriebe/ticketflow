@@ -221,6 +221,59 @@ services:
       start_period: 40s
     networks: [ticketflow]
 
+  # ---------------------------------------------------------------------------
+  # The external payment provider, stubbed with Wiremock.
+  #
+  # Never a real gateway, not even locally. The stubs make the unhappy paths
+  # reproducible: a charge above 2000 is declined, so ordering a Camarote ticket
+  # (2400) demonstrates the refusal branch while Pista (650) demonstrates
+  # approval - without editing a single file.
+  #
+  # Admin API at http://localhost:8090/__admin to inspect the requests received.
+  # ---------------------------------------------------------------------------
+  payment-gateway:
+    profiles: [apps]
+    image: wiremock/wiremock:3.9.2
+    container_name: ticketflow-payment-gateway
+    restart: unless-stopped
+    command: ["--global-response-templating", "--disable-banner"]
+    ports:
+      - "${PAYMENT_GATEWAY_PORT:-8090}:8080"
+    volumes:
+      - ./infra/wiremock/mappings:/home/wiremock/mappings:ro
+    networks: [ticketflow]
+
+  # ---------------------------------------------------------------------------
+  # Payment Service. A worker: it exposes no business API, only actuator.
+  # ---------------------------------------------------------------------------
+  payment-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    container_name: ticketflow-payment-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      payment-gateway:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_USER: ${POSTGRES_USER:-ticketflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow}
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [ticketflow]
+
 volumes:
   postgres-data:
   mongo-data:

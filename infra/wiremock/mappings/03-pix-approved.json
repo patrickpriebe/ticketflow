@@ -1,0 +1,19 @@
+{
+  "name": "pix approved",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/pix/charges"
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "approved",
+      "transactionId": "pix_{{randomValue length=24 type='ALPHANUMERIC'}}"
+    },
+    "transformers": ["response-template"]
+  }
+}

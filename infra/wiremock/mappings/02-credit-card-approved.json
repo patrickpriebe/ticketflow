@@ -1,0 +1,19 @@
+{
+  "name": "credit card approved (default)",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/charges"
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "approved",
+      "transactionId": "ch_{{randomValue length=24 type='ALPHANUMERIC'}}"
+    },
+    "transformers": ["response-template"]
+  }
+}

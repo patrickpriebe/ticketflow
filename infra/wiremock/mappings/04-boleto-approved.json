@@ -1,0 +1,19 @@
+{
+  "name": "boleto approved",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/boletos"
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "approved",
+      "transactionId": "bol_{{randomValue length=24 type='ALPHANUMERIC'}}"
+    },
+    "transformers": ["response-template"]
+  }
+}

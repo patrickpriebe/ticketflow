@@ -1,0 +1,24 @@
+{
+  "name": "credit card declined above 2000",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/charges",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$[?(@.amount > 2000)]"
+      }
+    ]
+  },
+  "response": {
+    "status": 402,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "declined",
+      "code": "INSUFFICIENT_FUNDS",
+      "message": "Card declined by issuer"
+    }
+  }
+}
