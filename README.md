@@ -204,6 +204,26 @@ http://localhost:8090/__admin/requests.
 
 ---
 
+## Frontend
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+http://localhost:5173, com o Order Service de pé. O Vite faz proxy de `/api` para
+`localhost:8081` — em produção o front seria servido do mesmo domínio, e abrir CORS
+só para desenvolvimento é configuração que vaza para produção por esquecimento.
+
+Duas telas: catálogo de eventos e acompanhamento do pedido. A segunda existe para
+tornar visível a premissa do projeto — o status começa em **aguardando pagamento** e
+muda sozinho, sem nada na tela ter ficado bloqueado esperando o gateway.
+
+O acompanhamento é **polling**, não WebSocket, porque é o que o contrato define: o
+`POST` responde `202` e o cliente consulta o pedido. Push exigiria SSE no Order
+Service, e está anotado como próximo passo em vez de simulado.
+
+---
+
 ## Observabilidade
 
 ```bash
@@ -315,7 +335,7 @@ compilação anularia boa parte do sentido de separá-los em tempo de execução
 ### Fase 4 — CI/CD e frontend
 
 - [x] Pipeline: build Maven, testes, lint dos contratos, imagem Docker
-- [ ] Telas React: lista de eventos e status do pedido em tempo real
+- [x] Telas React: lista de eventos e acompanhamento do pedido
 
 ---
 
