@@ -85,8 +85,13 @@ springdoc:
 
 ticketflow:
   order:
-    # How long an order may sit in PENDING before an expiry job may cancel it.
+    # How long an order may sit in PENDING before the expiry sweep releases it.
     payment-window: PT15M
+    expiry:
+      enabled: true
+      # Milliseconds between sweeps. Reserved inventory is only as fresh as this.
+      interval: 60000
+      batch-size: 100
   outbox:
     # Milliseconds between relay cycles.
     poll-interval: 1000

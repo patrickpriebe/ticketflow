@@ -6,6 +6,8 @@ import com.ticketflow.order.domain.exception.DuplicateIdempotencyKeyException;
 import com.ticketflow.order.domain.model.Order;
 import com.ticketflow.order.domain.model.OrderStatus;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,4 +40,12 @@ public interface OrderRepository {
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
     PageResult<Order> findByCustomer(UUID customerId, OrderStatus status, PageQuery pageQuery);
+
+    /**
+     * Orders still PENDING whose payment window has elapsed, oldest first.
+     *
+     * @param limit batch size - expiry is a background sweep and must never try to
+     *              load every stale order at once
+     */
+    List<Order> findExpired(Instant now, int limit);
 }

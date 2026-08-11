@@ -22,6 +22,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -121,6 +123,17 @@ public class OrderRepositoryAdapter implements OrderRepository {
                 pageQuery.page(),
                 pageQuery.size(),
                 page.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Order> findExpired(Instant now, int limit) {
+        return jpaOrders
+                .findByStatusAndExpiresAtLessThanEqualOrderByExpiresAtAsc(
+                        OrderStatus.PENDING, now, PageRequest.of(0, limit))
+                .stream()
+                .map(OrderMapper::toDomain)
+                .toList();
     }
 
     /** Walks the cause chain looking for a specific database constraint by name. */

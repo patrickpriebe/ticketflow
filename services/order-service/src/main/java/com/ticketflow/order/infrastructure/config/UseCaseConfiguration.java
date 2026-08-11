@@ -2,6 +2,7 @@ package com.ticketflow.order.infrastructure.config;
 
 import com.ticketflow.order.application.port.in.ApplyPaymentResultUseCase;
 import com.ticketflow.order.application.port.in.CreateOrderUseCase;
+import com.ticketflow.order.application.port.in.ExpirePendingOrdersUseCase;
 import com.ticketflow.order.application.port.in.GetEventUseCase;
 import com.ticketflow.order.application.port.in.GetOrderUseCase;
 import com.ticketflow.order.application.port.in.ListEventsUseCase;
@@ -13,6 +14,7 @@ import com.ticketflow.order.application.port.out.ProcessedEventRepository;
 import com.ticketflow.order.application.port.out.UnitOfWork;
 import com.ticketflow.order.application.usecase.ApplyPaymentResult;
 import com.ticketflow.order.application.usecase.CreateOrder;
+import com.ticketflow.order.application.usecase.ExpirePendingOrders;
 import com.ticketflow.order.application.usecase.GetEvent;
 import com.ticketflow.order.application.usecase.GetOrder;
 import com.ticketflow.order.application.usecase.ListEvents;
@@ -57,6 +59,16 @@ public class UseCaseConfiguration {
                                                                ProcessedEventRepository processedEvents,
                                                                UnitOfWork unitOfWork) {
         return new ApplyPaymentResult(orders, catalog, processedEvents, unitOfWork);
+    }
+
+    @Bean
+    public ExpirePendingOrdersUseCase expirePendingOrdersUseCase(
+            OrderRepository orders,
+            CatalogRepository catalog,
+            UnitOfWork unitOfWork,
+            Clock clock,
+            @Value("${ticketflow.order.expiry.batch-size:100}") int batchSize) {
+        return new ExpirePendingOrders(orders, catalog, unitOfWork, clock, batchSize);
     }
 
     @Bean

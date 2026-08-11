@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,4 +30,12 @@ public interface JpaOrderRepository extends JpaRepository<OrderEntity, UUID> {
 
     @EntityGraph(attributePaths = "items")
     Page<OrderEntity> findByCustomerIdAndStatus(UUID customerId, OrderStatus status, Pageable pageable);
+
+    /**
+     * Stale orders for the expiry sweep. The filtering is the database's job - the
+     * partial index on status = 'PENDING' makes this cheap even as the table grows.
+     */
+    @EntityGraph(attributePaths = "items")
+    List<OrderEntity> findByStatusAndExpiresAtLessThanEqualOrderByExpiresAtAsc(
+            OrderStatus status, Instant deadline, Pageable pageable);
 }
