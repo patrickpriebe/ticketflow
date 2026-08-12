@@ -214,13 +214,22 @@ http://localhost:5173, com o Order Service de pé. O Vite faz proxy de `/api` pa
 `localhost:8081` — em produção o front seria servido do mesmo domínio, e abrir CORS
 só para desenvolvimento é configuração que vaza para produção por esquecimento.
 
-Duas telas: catálogo de eventos e acompanhamento do pedido. A segunda existe para
-tornar visível a premissa do projeto — o status começa em **aguardando pagamento** e
-muda sozinho, sem nada na tela ter ficado bloqueado esperando o gateway.
+Quatro telas: catálogo, página do evento com seleção de ingresso, login e
+acompanhamento do pedido. A última existe para tornar visível a premissa do
+projeto — o status começa em **aguardando pagamento** e muda sozinho, sem nada na
+tela ter ficado bloqueado esperando o gateway.
 
-O acompanhamento é **polling**, não WebSocket, porque é o que o contrato define: o
-`POST` responde `202` e o cliente consulta o pedido. Push exigiria SSE no Order
-Service, e está anotado como próximo passo em vez de simulado.
+Detalhes que valem reparar:
+
+- **O catálogo é público, comprar exige login.** A API tira quem você é do `sub` do
+  token; o corpo da requisição não tem campo de cliente para ser adulterado.
+- **A arte dos eventos é gerada do id.** O catálogo não tem imagem e não vale
+  inventar um campo no contrato só para o front ficar bonito — cada evento ganha um
+  gradiente estável em vez de um retângulo cinza de "sem imagem".
+- **Polling, não WebSocket**, porque é o que o contrato define: o `POST` responde
+  `202` e o cliente consulta o pedido. Push exigiria SSE no Order Service, e está
+  anotado como próximo passo em vez de simulado. O polling para sozinho quando o
+  pedido chega a um estado final.
 
 ---
 
@@ -356,7 +365,8 @@ Anotadas para não parecerem esquecimento:
 - As tabelas `processed_events` no Postgres crescem sem limite. A do MongoDB já tem
   TTL de 30 dias; as do Postgres precisam de uma limpeza agendada.
 - O relay do outbox ainda não existe (fase 2). Sem ele, nada é publicado no Kafka.
-- Não há autenticação em nada — `customerId` chega no corpo da requisição. Um
-  sistema real teria JWT e tiraria a identidade do token, nunca do payload.
+- O provedor de identidade é simulado. O Order Service valida JWT como resource
+  server, mas os tokens saem de um endpoint de desenvolvimento que não verifica
+  senha. Trocar por um provedor real é substituir um bean por `issuer-uri`.
 - `ticket_categories` tem contadores de estoque, mas a reserva efetiva no momento do
   pedido é trabalho da fase 2.
