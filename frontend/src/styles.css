@@ -298,6 +298,55 @@ button { font: inherit; cursor: pointer; }
 
 .fine-print { margin-top: .9rem; font-size: .78rem; color: var(--ink-soft); line-height: 1.5; }
 
+/* ---------- forma de pagamento ---------- */
+
+.method-picker { padding: .9rem 0; border-bottom: 1px solid var(--line); }
+.methods { display: grid; gap: .4rem; margin-top: .5rem; }
+.method {
+  display: flex; flex-direction: column; gap: .05rem; text-align: left;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: .55rem .75rem;
+}
+.method:hover { border-color: #c9b8f5; }
+.method.active { border-color: var(--brand); background: var(--brand-soft); }
+.method strong { font-size: .9rem; }
+
+/* ---------- prazo ---------- */
+
+.deadline {
+  display: flex; flex-direction: column; gap: .15rem;
+  margin-top: 1rem; padding: .75rem .9rem;
+  background: var(--warn-soft); border-radius: 10px;
+}
+.countdown { font-weight: 700; color: var(--warn); font-variant-numeric: tabular-nums; }
+.countdown.urgent { color: var(--bad); }
+.countdown.late { color: var(--ink-soft); font-weight: 500; }
+
+/* ---------- ingressos emitidos ---------- */
+
+.tickets { margin-bottom: 1.6rem; }
+.tickets h3 { margin-bottom: .8rem; }
+.ticket-cards { display: grid; gap: .6rem; }
+.ticket-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: .85rem 1rem;
+}
+.ticket-card-main { display: flex; flex-direction: column; gap: .1rem; }
+.ticket-code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-weight: 700; letter-spacing: .04em; font-size: 1rem;
+}
+
+/* Marcador de QR: uma grade 3x3, o suficiente para o olho reconhecer o objeto
+   sem trazer uma biblioteca de geração para um projeto de portfólio. */
+.qr {
+  display: grid; grid-template-columns: repeat(3, 9px); gap: 3px;
+  padding: 7px; background: var(--ink); border-radius: 7px; flex-shrink: 0;
+}
+.qr span { width: 9px; height: 9px; background: #fff; border-radius: 1px; }
+.qr span:nth-child(2), .qr span:nth-child(4), .qr span:nth-child(9) { background: transparent; }
+
 /* ---------- canhoto do pedido ---------- */
 
 .stub {

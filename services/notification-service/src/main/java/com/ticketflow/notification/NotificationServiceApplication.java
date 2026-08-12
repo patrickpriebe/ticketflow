@@ -32,6 +32,12 @@ public class NotificationServiceApplication {
      * it unit-testable with ordinary fakes.
      */
     @Bean
+    public com.ticketflow.notification.application.usecase.FindMyTickets findMyTickets(
+            Repositories.Tickets tickets) {
+        return new com.ticketflow.notification.application.usecase.FindMyTickets(tickets);
+    }
+
+    @Bean
     public HandlePaymentResult handlePaymentResult(Repositories.OrderSnapshots snapshots,
                                                    Repositories.Tickets tickets,
                                                    Repositories.Notifications notifications,

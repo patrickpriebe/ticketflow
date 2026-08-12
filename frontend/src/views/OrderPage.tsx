@@ -1,4 +1,7 @@
-import type { Order, OrderStatus } from '../api';
+import { useEffect, useState } from 'react';
+import { listTickets, type Order, type OrderStatus, type Ticket } from '../api';
+import { Countdown } from '../components/Countdown';
+import { TicketList } from '../components/TicketList';
 import { dateTime, money } from '../lib/format';
 
 interface Props {
@@ -6,6 +9,12 @@ interface Props {
   error: string | null;
   onBack: () => void;
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  CREDIT_CARD: 'Cartão de crédito',
+  PIX: 'PIX',
+  BOLETO: 'Boleto',
+};
 
 /**
  * `label` vai no selo, `headline` no título. São textos diferentes de propósito:
@@ -45,6 +54,25 @@ const STATUS: Record<OrderStatus, { label: string; headline: string; hint: strin
 };
 
 export function OrderPage({ order, error, onBack }: Props) {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const paid = order?.status === 'PAID';
+
+  // Os ingressos só existem depois que o pagamento é aprovado, e são emitidos por
+  // outro serviço — buscar antes disso seria pedir algo que ainda não foi criado.
+  useEffect(() => {
+    if (!paid || !order) return;
+    let cancelled = false;
+    listTickets(order.id)
+      .then((page) => !cancelled && setTickets(page.content))
+      .catch(() => {
+        /* o pedido está pago de qualquer forma; a falta do ingresso na tela não
+           deve virar erro em cima de uma compra bem-sucedida */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paid, order?.id]);
+
   if (!order) {
     return (
       <section className="shell section">
@@ -88,9 +116,22 @@ export function OrderPage({ order, error, onBack }: Props) {
           </ul>
 
           <div className="stub-total">
-            <span>Total</span>
+            <div>
+              <span>Total</span>
+              <div className="muted small">{METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod}</div>
+            </div>
             <strong>{money(order.totalAmount)}</strong>
           </div>
+
+          {/* O relógio só importa enquanto o pagamento pode chegar. */}
+          {order.status === 'PENDING' && order.expiresAt && (
+            <div className="deadline">
+              <Countdown deadline={order.expiresAt} />
+              <span className="muted small">
+                Depois disso os ingressos voltam para o estoque.
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="perforation" aria-hidden="true">
@@ -100,6 +141,8 @@ export function OrderPage({ order, error, onBack }: Props) {
         </div>
 
         <div className="stub-bottom">
+          <TicketList tickets={tickets} />
+
           <h3>Acompanhamento</h3>
           <ol className="timeline">
             {order.statusHistory.map((change, i) => {

@@ -47,8 +47,11 @@ export interface Order {
   id: string;
   status: OrderStatus;
   customer: { id: string; name: string; email: string };
+  paymentMethod: string;
   items: { categoryName: string; quantity: number; unitPrice: Money; subtotal: Money }[];
   totalAmount: Money;
+  /** Prazo para o pagamento chegar. Depois disso o job de expiração devolve os ingressos ao estoque. */
+  expiresAt: string | null;
   statusHistory: OrderStatusChange[];
   createdAt: string;
 }
@@ -172,10 +175,13 @@ export function listMyOrders(): Promise<Page<Order>> {
   return request<Page<Order>>('/api/v1/orders');
 }
 
+export type PaymentMethod = 'CREDIT_CARD' | 'PIX' | 'BOLETO';
+
 export interface PlaceOrderInput {
   eventId: string;
   ticketCategoryId: string;
   quantity: number;
+  paymentMethod: PaymentMethod;
 }
 
 export function placeOrder(input: PlaceOrderInput): Promise<Order> {
@@ -188,8 +194,33 @@ export function placeOrder(input: PlaceOrderInput): Promise<Order> {
     },
     body: JSON.stringify({
       eventId: input.eventId,
-      paymentMethod: 'CREDIT_CARD',
+      paymentMethod: input.paymentMethod,
       items: [{ ticketCategoryId: input.ticketCategoryId, quantity: input.quantity }],
     }),
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * Ingressos — Notification Service
+ *
+ * Serviço diferente, dono de dados diferentes. O front fala com os dois
+ * porque cada um é responsável pelo que guarda; o Order Service não
+ * conhece ingresso, e perguntar a ele seria acoplar os dois.
+ * ------------------------------------------------------------------ */
+
+export interface Ticket {
+  id: string;
+  ticketCode: string;
+  orderId: string;
+  eventName: string | null;
+  categoryName: string | null;
+  holderName: string;
+  qrCodePayload: string;
+  status: string;
+  issuedAt: string;
+}
+
+export function listTickets(orderId?: string): Promise<{ content: Ticket[] }> {
+  const query = orderId ? `?orderId=${encodeURIComponent(orderId)}` : '';
+  return request<{ content: Ticket[] }>(`/api/v1/tickets${query}`);
 }

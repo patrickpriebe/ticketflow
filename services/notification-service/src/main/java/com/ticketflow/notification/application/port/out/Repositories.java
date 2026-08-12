@@ -30,6 +30,18 @@ public final class Repositories {
         void saveAll(List<Ticket> tickets);
 
         List<Ticket> findByOrderId(String orderId);
+
+        /**
+         * Ingressos de um pedido que pertencem àquele cliente.
+         *
+         * <p>O filtro por dono faz parte da consulta, não é conferido depois: uma
+         * verificação esquecida em algum caminho de chamada é como vazamento de
+         * dado acontece.
+         */
+        List<Ticket> findByOrderIdAndHolder(String orderId, String customerId);
+
+        /** Todos os ingressos de um cliente, do mais recente para o mais antigo. */
+        List<Ticket> findByHolder(String customerId);
     }
 
     public interface Notifications {

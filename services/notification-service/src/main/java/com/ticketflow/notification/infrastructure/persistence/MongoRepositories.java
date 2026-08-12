@@ -6,6 +6,7 @@ import com.ticketflow.notification.domain.model.OrderSnapshot;
 import com.ticketflow.notification.domain.model.Ticket;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -76,6 +77,22 @@ public final class MongoRepositories {
         @Override
         public List<Ticket> findByOrderId(String orderId) {
             return mongo.find(Query.query(Criteria.where("orderId").is(orderId)),
+                    Ticket.class, TICKETS);
+        }
+
+        @Override
+        public List<Ticket> findByOrderIdAndHolder(String orderId, String customerId) {
+            return mongo.find(
+                    Query.query(Criteria.where("orderId").is(orderId)
+                            .and("holder.customerId").is(customerId)),
+                    Ticket.class, TICKETS);
+        }
+
+        @Override
+        public List<Ticket> findByHolder(String customerId) {
+            return mongo.find(
+                    Query.query(Criteria.where("holder.customerId").is(customerId))
+                            .with(Sort.by(Sort.Direction.DESC, "issuedAt")),
                     Ticket.class, TICKETS);
         }
     }

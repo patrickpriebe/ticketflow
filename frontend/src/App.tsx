@@ -11,6 +11,7 @@ import {
   type EventDetail,
   type EventSummary,
   type Order,
+  type PaymentMethod,
   type Session,
 } from './api';
 import { Header } from './components/Header';
@@ -75,7 +76,7 @@ export default function App() {
     }
   };
 
-  const buy = async (ticketCategoryId: string, quantity: number) => {
+  const buy = async (ticketCategoryId: string, quantity: number, paymentMethod: PaymentMethod) => {
     if (view.name !== 'event') return;
 
     // Comprar exige sessão. Mandar para o login em vez de deixar a API responder
@@ -90,7 +91,12 @@ export default function App() {
     setPlacing(true);
     setError(null);
     try {
-      const created = await placeOrder({ eventId: view.event.id, ticketCategoryId, quantity });
+      const created = await placeOrder({
+        eventId: view.event.id,
+        ticketCategoryId,
+        quantity,
+        paymentMethod,
+      });
       setView({ name: 'order', orderId: created.id });
     } catch (e) {
       // Um 409 de estoque chega com o texto do backend, que já diz quantos restam.

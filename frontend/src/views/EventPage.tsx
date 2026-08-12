@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EventDetail } from '../api';
+import type { EventDetail, PaymentMethod } from '../api';
 import { artwork } from '../lib/artwork';
 import { longDate, money, time } from '../lib/format';
 
@@ -7,14 +7,27 @@ interface Props {
   event: EventDetail;
   placing: boolean;
   onBack: () => void;
-  onBuy: (ticketCategoryId: string, quantity: number) => void;
+  onBuy: (ticketCategoryId: string, quantity: number, paymentMethod: PaymentMethod) => void;
 }
 
 const MAX_PER_ORDER = 10;
 
+/**
+ * Os três métodos que o backend aceita — e cada um segue uma `PaymentStrategy`
+ * diferente lá dentro: endpoint próprio no gateway e política de retry distinta.
+ * Antes o front mandava CREDIT_CARD fixo, então essa parte do sistema nunca era
+ * exercitada por quem usava a tela.
+ */
+const METHODS: { id: PaymentMethod; label: string; hint: string }[] = [
+  { id: 'CREDIT_CARD', label: 'Cartão de crédito', hint: 'Aprovação na hora' },
+  { id: 'PIX', label: 'PIX', hint: 'Confirmação em segundos' },
+  { id: 'BOLETO', label: 'Boleto', hint: 'Compensa em até 3 dias' },
+];
+
 export function EventPage({ event, placing, onBack, onBuy }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [method, setMethod] = useState<PaymentMethod>('CREDIT_CARD');
 
   const category = event.categories.find((c) => c.id === selected) ?? null;
   // O teto é o menor entre o limite por pedido e o que ainda existe em estoque —
@@ -101,6 +114,22 @@ export function EventPage({ event, placing, onBack, onBuy }: Props) {
                 </div>
               </div>
 
+              <div className="method-picker">
+                <span className="muted small">Forma de pagamento</span>
+                <div className="methods">
+                  {METHODS.map((m) => (
+                    <button
+                      key={m.id}
+                      className={`method${m.id === method ? ' active' : ''}`}
+                      onClick={() => setMethod(m.id)}
+                    >
+                      <strong>{m.label}</strong>
+                      <span className="muted small">{m.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="summary-total">
                 <span>Total</span>
                 <strong>{money({ amount: total, currency: category.price.currency })}</strong>
@@ -109,7 +138,7 @@ export function EventPage({ event, placing, onBack, onBuy }: Props) {
               <button
                 className="primary block"
                 disabled={placing}
-                onClick={() => onBuy(category.id, quantity)}
+                onClick={() => onBuy(category.id, quantity, method)}
               >
                 {placing ? 'Enviando…' : 'Comprar agora'}
               </button>

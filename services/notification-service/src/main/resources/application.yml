@@ -55,6 +55,11 @@ spring:
               dlq-name: ticketflow.payments.processed.dlq
 
 ticketflow:
+  auth:
+    # Mesmo segredo que o Order Service valida: os dois são resource servers do
+    # mesmo provedor. Em produção vira issuer-uri apontando para o provedor real.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+
   archive:
     # Desligado por padrão: o serviço tem que rodar sem AWS nenhuma, e ninguém
     # deveria precisar do LocalStack de pé só para ver um pedido passar.
