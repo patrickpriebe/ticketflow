@@ -19,6 +19,8 @@ public class TicketEvent {
 
     private final UUID id;
     private final String name;
+    /** Free text shown on the event page. Optional: the catalogue allows it to be null. */
+    private final String description;
     private final String venue;
     private final String city;
     private final Instant startsAt;
@@ -29,6 +31,7 @@ public class TicketEvent {
 
     public TicketEvent(UUID id,
                        String name,
+                       String description,
                        String venue,
                        String city,
                        Instant startsAt,
@@ -38,6 +41,7 @@ public class TicketEvent {
                        List<TicketCategory> categories) {
         this.id = Objects.requireNonNull(id, "event id is required");
         this.name = Objects.requireNonNull(name, "event name is required");
+        this.description = description;
         this.venue = Objects.requireNonNull(venue, "venue is required");
         this.city = Objects.requireNonNull(city, "city is required");
         this.startsAt = Objects.requireNonNull(startsAt, "startsAt is required");
@@ -98,6 +102,10 @@ public class TicketEvent {
 
     public String name() {
         return name;
+    }
+
+    public String description() {
+        return description;
     }
 
     public String venue() {

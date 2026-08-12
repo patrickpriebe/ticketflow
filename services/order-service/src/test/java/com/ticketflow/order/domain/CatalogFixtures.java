@@ -44,6 +44,7 @@ public final class CatalogFixtures {
         return new TicketEvent(
                 eventId,
                 "Rock in Rio 2026 - Dia 1",
+                "Palco Mundo com line-up internacional.",
                 "Parque Olimpico",
                 "Rio de Janeiro",
                 NOW.plusSeconds(86_400 * 30),
@@ -58,6 +59,7 @@ public final class CatalogFixtures {
         return new TicketEvent(
                 eventId,
                 "Final do Campeonato Estadual",
+                "Jogo decisivo, ingressos limitados.",
                 "Arena Central",
                 "Belo Horizonte",
                 NOW.plusSeconds(86_400 * 60),
@@ -73,6 +75,7 @@ public final class CatalogFixtures {
         return new TicketEvent(
                 eventId,
                 "Sinfonica Municipal - Beethoven 9",
+                "Nona sinfonia completa com coral.",
                 "Theatro Municipal",
                 "Sao Paulo",
                 NOW.plusSeconds(3_600),

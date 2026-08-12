@@ -35,6 +35,7 @@ public final class EventResponse {
 
     public record Detail(UUID id,
                          String name,
+                         String description,
                          String venue,
                          String city,
                          Instant startsAt,
@@ -48,6 +49,7 @@ public final class EventResponse {
             return new Detail(
                     event.id(),
                     event.name(),
+                    event.description(),
                     event.venue(),
                     event.city(),
                     event.startsAt(),

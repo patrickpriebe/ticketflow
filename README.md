@@ -14,6 +14,8 @@ sustentar essa premissa.
 - [Arquitetura](docs/01-arquitetura.md) — por que Kafka, por que outbox, por que dois bancos
 - [Modelagem de dados](docs/02-modelagem-dados.md) — as tabelas, as coleções e o motivo de cada escolha
 - [Eventos Kafka](docs/03-eventos-kafka.md) — tópicos, envelope, retry, DLQ
+- [Frontend](docs/04-frontend.md) — design system, temas e as decisões da tela
+- [Roadmap do produto](docs/05-roadmap-produto.md) — o que ainda não existe, e o que fica de fora
 - [Contrato da API](contracts/openapi/order-service.yaml) — OpenAPI 3.0 do Order Service
 
 ---
@@ -210,26 +212,37 @@ http://localhost:8090/__admin/requests.
 cd frontend && npm install && npm run dev
 ```
 
-http://localhost:5173, com o Order Service de pé. O Vite faz proxy de `/api` para
+http://localhost:5173, com o Order Service e o Notification Service de pé. O Vite
+faz proxy de `/api/v1/tickets` para `localhost:8083` e do resto de `/api` para
 `localhost:8081` — em produção o front seria servido do mesmo domínio, e abrir CORS
 só para desenvolvimento é configuração que vaza para produção por esquecimento.
 
-Quatro telas: catálogo, página do evento com seleção de ingresso, login e
-acompanhamento do pedido. A última existe para tornar visível a premissa do
-projeto — o status começa em **aguardando pagamento** e muda sozinho, sem nada na
-tela ter ficado bloqueado esperando o gateway.
+Sete telas, com URL de verdade: home, descobrir com filtros, evento, checkout,
+pedido, meus pedidos e identificação. A tela do pedido existe para tornar visível a
+premissa do projeto — o status começa em **aguardando pagamento** e muda sozinho,
+sem nada na tela ter ficado bloqueado esperando o gateway.
+
+Tema claro e escuro, com um terceiro estado que segue o sistema. Sem ele, quem
+escolheu uma vez fica preso na escolha — e quase ninguém volta ao botão para
+corrigir.
 
 Detalhes que valem reparar:
 
 - **O catálogo é público, comprar exige login.** A API tira quem você é do `sub` do
   token; o corpo da requisição não tem campo de cliente para ser adulterado.
-- **A arte dos eventos é gerada do id.** O catálogo não tem imagem e não vale
-  inventar um campo no contrato só para o front ficar bonito — cada evento ganha um
-  gradiente estável em vez de um retângulo cinza de "sem imagem".
+- **Nenhum dado de cartão é coletado.** Não é simplificação: o Payment Service fala
+  com um gateway simulado, e mesmo em produção só bandeira e últimos quatro dígitos
+  seriam guardados. Um formulário de cartão que não vai a lugar nenhum seria teatro.
+- **O pôster de cada evento é desenhado a partir do id.** O catálogo não tem imagem,
+  e criar um campo no contrato só para o front ficar bonito seria o rabo abanando o
+  cachorro — cada evento ganha um SVG estável em vez de um retângulo cinza.
 - **Polling, não WebSocket**, porque é o que o contrato define: o `POST` responde
   `202` e o cliente consulta o pedido. Push exigiria SSE no Order Service, e está
   anotado como próximo passo em vez de simulado. O polling para sozinho quando o
   pedido chega a um estado final.
+
+Detalhes de arquitetura do front em [docs/04-frontend.md](docs/04-frontend.md); o
+que ainda não existe está em [docs/05-roadmap-produto.md](docs/05-roadmap-produto.md).
 
 ---
 

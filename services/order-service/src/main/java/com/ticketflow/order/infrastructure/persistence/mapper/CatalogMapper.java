@@ -18,6 +18,7 @@ public final class CatalogMapper {
         return new TicketEvent(
                 entity.getId(),
                 entity.getName(),
+                entity.getDescription(),
                 entity.getVenue(),
                 entity.getCity(),
                 entity.getStartsAt(),
