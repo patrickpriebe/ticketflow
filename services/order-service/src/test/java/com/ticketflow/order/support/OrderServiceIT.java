@@ -1,6 +1,11 @@
 package com.ticketflow.order.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,9 +13,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,6 +38,9 @@ public abstract class OrderServiceIT {
     protected static final UUID PISTA_ID = UUID.fromString("aaaaaaaa-0001-4000-8000-000000000001");
     protected static final UUID CAMAROTE_ID = UUID.fromString("aaaaaaaa-0001-4000-8000-000000000003");
     protected static final UUID CUSTOMER_ID = UUID.fromString("3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10");
+
+    /** Precisa bater com o `ticketflow.auth.secret` que os testes configuram. */
+    public static final String TEST_SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
 
     @Autowired
     protected JdbcTemplate jdbc;
@@ -104,16 +114,43 @@ public abstract class OrderServiceIT {
                 CAMAROTE_ID, EVENT_ID);
     }
 
+    /** O corpo não carrega quem compra: essa informação vem do token. */
     protected String orderBody(UUID categoryId, int quantity) throws Exception {
         return objectMapper.writeValueAsString(Map.of(
-                "customer", Map.of(
-                        "id", CUSTOMER_ID.toString(),
-                        "name", "Ana Souza",
-                        "email", "ana.souza@example.com"),
                 "eventId", EVENT_ID.toString(),
                 "paymentMethod", "CREDIT_CARD",
                 "items", List.of(Map.of(
                         "ticketCategoryId", categoryId.toString(),
                         "quantity", quantity))));
+    }
+
+    /** Token do cliente padrão dos testes. */
+    protected String bearerToken() {
+        return bearerToken(CUSTOMER_ID);
+    }
+
+    /**
+     * Assina um JWT com o mesmo segredo que o serviço valida.
+     *
+     * <p>Emitido aqui em vez de chamar o endpoint de desenvolvimento: um teste que
+     * depende de outro endpoint estar ligado testa duas coisas ao mesmo tempo.
+     */
+    protected String bearerToken(UUID customerId) {
+        try {
+            JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                    .subject(customerId.toString())
+                    .claim("name", "Ana Souza")
+                    .claim("email", "ana.souza@example.com")
+                    .issueTime(Date.from(Instant.now()))
+                    .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+                    .build();
+
+            SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+            jwt.sign(new MACSigner(TEST_SECRET.getBytes(StandardCharsets.UTF_8)));
+            return "Bearer " + jwt.serialize();
+
+        } catch (Exception e) {
+            throw new IllegalStateException("não consegui assinar o token de teste", e);
+        }
     }
 }

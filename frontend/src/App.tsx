@@ -1,182 +1,175 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  currentSession,
   getEvent,
   listEvents,
+  listMyOrders,
   placeOrder,
   ProblemError,
+  signIn,
+  signOut,
   type EventDetail,
   type EventSummary,
-  type OrderStatus,
+  type Order,
+  type Session,
 } from './api';
+import { Header } from './components/Header';
+import { money } from './lib/format';
 import { useOrderStatus } from './useOrderStatus';
+import { Catalog } from './views/Catalog';
+import { EventPage } from './views/EventPage';
+import { OrderPage } from './views/OrderPage';
+import { SignIn } from './views/SignIn';
 
-// Cliente fixo porque a API ainda não tem autenticação — a identidade chega no
-// corpo. Está listado como dívida conhecida no README; um front real leria isso
-// do token.
-const CUSTOMER = {
-  id: '3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10',
-  name: 'Ana Souza',
-  email: 'ana.souza@example.com',
-};
-
-const money = (value: { amount: number; currency: string }) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: value.currency }).format(value.amount);
-
-const dateTime = (iso: string) =>
-  new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso));
-
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  PENDING: 'Aguardando pagamento',
-  PAID: 'Pago',
-  REJECTED: 'Pagamento recusado',
-  CANCELLED: 'Cancelado',
-  EXPIRED: 'Expirado',
-};
+type View =
+  | { name: 'catalog' }
+  | { name: 'event'; event: EventDetail }
+  | { name: 'order'; orderId: string }
+  | { name: 'orders' }
+  | { name: 'signin' };
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(currentSession);
+  const [view, setView] = useState<View>({ name: 'catalog' });
+  /** Para onde voltar depois do login, para não perder o que estava sendo comprado. */
+  const [returnTo, setReturnTo] = useState<View | null>(null);
   const [events, setEvents] = useState<EventSummary[]>([]);
-  const [selected, setSelected] = useState<EventDetail | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { order, error: pollError } = useOrderStatus(orderId);
+  const { order, error: pollError } = useOrderStatus(
+    view.name === 'order' ? view.orderId : null,
+  );
 
   useEffect(() => {
     listEvents()
       .then((page) => setEvents(page.content))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Falha ao carregar eventos'));
+      .catch(() => setError('Não foi possível carregar os eventos.'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const openEvent = async (id: string) => {
+  const goHome = useCallback(() => {
+    setView({ name: 'catalog' });
+    setError(null);
+  }, []);
+
+  const openEvent = async (eventId: string) => {
     setError(null);
     try {
-      setSelected(await getEvent(id));
+      setView({ name: 'event', event: await getEvent(eventId) });
+    } catch {
+      setError('Não foi possível carregar este evento.');
+    }
+  };
+
+  const openMyOrders = async () => {
+    setError(null);
+    try {
+      const page = await listMyOrders();
+      setMyOrders(page.content);
+      setView({ name: 'orders' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Falha ao carregar o evento');
+      setError(e instanceof ProblemError ? e.detail : 'Não foi possível carregar seus pedidos.');
     }
   };
 
   const buy = async (ticketCategoryId: string, quantity: number) => {
-    if (!selected) return;
+    if (view.name !== 'event') return;
+
+    // Comprar exige sessão. Mandar para o login em vez de deixar a API responder
+    // 401 e mostrar um erro seco - e guardar o evento, para que entrar não custe
+    // ao cliente refazer o caminho todo.
+    if (!session) {
+      setReturnTo(view);
+      setView({ name: 'signin' });
+      return;
+    }
+
     setPlacing(true);
     setError(null);
     try {
-      const created = await placeOrder({
-        eventId: selected.id,
-        ticketCategoryId,
-        quantity,
-        customer: CUSTOMER,
-      });
-      setOrderId(created.id);
-      setSelected(null);
+      const created = await placeOrder({ eventId: view.event.id, ticketCategoryId, quantity });
+      setView({ name: 'order', orderId: created.id });
     } catch (e) {
-      // Um 409 de estoque insuficiente chega aqui com o texto do backend, que já
-      // diz quantos ingressos restam.
-      setError(e instanceof ProblemError ? `${e.title}: ${e.detail}` : 'Falha ao criar o pedido');
+      // Um 409 de estoque chega com o texto do backend, que já diz quantos restam.
+      setError(e instanceof ProblemError ? `${e.title}: ${e.detail}` : 'Não foi possível criar o pedido.');
     } finally {
       setPlacing(false);
     }
   };
 
-  const reset = () => {
-    setOrderId(null);
-    setSelected(null);
-    setError(null);
+  const doSignIn = async (name: string, email: string) => {
+    setSession(await signIn(name, email));
+    // Volta para onde a pessoa estava, com o evento já aberto.
+    setView(returnTo ?? { name: 'catalog' });
+    setReturnTo(null);
+  };
+
+  const doSignOut = () => {
+    signOut();
+    setSession(null);
+    goHome();
   };
 
   return (
-    <main>
-      <header>
-        <h1>TicketFlow</h1>
-        <p className="lede">
-          O pedido é aceito sem esperar o pagamento. Repare que o status abaixo começa
-          em <strong>aguardando</strong> e muda sozinho — nada nesta tela ficou bloqueado
-          esperando o gateway.
-        </p>
-      </header>
+    <div className="app">
+      <Header session={session} onHome={goHome} onMyOrders={openMyOrders} onSignOut={doSignOut} />
 
-      {error && <p className="error">{error}</p>}
+      <main>
+        {error && view.name !== 'order' && (
+          <div className="shell">
+            <p className="alert">{error}</p>
+          </div>
+        )}
 
-      {orderId ? (
-        <section className="card">
-          <h2>Seu pedido</h2>
-          {pollError && <p className="error">{pollError}</p>}
-          {!order ? (
-            <p className="muted">Carregando…</p>
-          ) : (
-            <>
-              <p className={`status status-${order.status.toLowerCase()}`}>
-                {STATUS_LABEL[order.status]}
-                {order.status === 'PENDING' && <span className="pulse" aria-hidden="true" />}
-              </p>
-              <p className="muted">
-                {order.items.map((i) => `${i.quantity}x ${i.categoryName}`).join(', ')} ·{' '}
-                {money(order.totalAmount)}
-              </p>
+        {view.name === 'catalog' && (
+          <Catalog events={events} loading={loading} onOpen={openEvent} />
+        )}
 
-              <ol className="timeline">
-                {order.statusHistory.map((change, i) => (
-                  <li key={i}>
-                    <strong>{STATUS_LABEL[change.toStatus]}</strong>
-                    <span className="muted"> · {dateTime(change.occurredAt)}</span>
-                    {change.reason && <div className="reason">{change.reason}</div>}
+        {view.name === 'event' && (
+          <EventPage event={view.event} placing={placing} onBack={goHome} onBuy={buy} />
+        )}
+
+        {view.name === 'order' && (
+          <OrderPage order={order} error={pollError} onBack={goHome} />
+        )}
+
+        {view.name === 'signin' && <SignIn onSignIn={doSignIn} />}
+
+        {view.name === 'orders' && (
+          <section className="shell section narrow">
+            <h2 className="section-title">Meus pedidos</h2>
+            {myOrders.length === 0 ? (
+              <p className="empty">Você ainda não fez nenhum pedido.</p>
+            ) : (
+              <ul className="order-list">
+                {myOrders.map((o) => (
+                  <li key={o.id}>
+                    <button onClick={() => setView({ name: 'order', orderId: o.id })}>
+                      <span>
+                        <strong>{o.items.map((i) => `${i.quantity}× ${i.categoryName}`).join(', ')}</strong>
+                        <span className="muted small"> · {money(o.totalAmount)}</span>
+                      </span>
+                      <span className={`pill pill-${o.status.toLowerCase()}`}>{o.status}</span>
+                    </button>
                   </li>
                 ))}
-              </ol>
+              </ul>
+            )}
+          </section>
+        )}
+      </main>
 
-              <button onClick={reset}>Fazer outro pedido</button>
-            </>
-          )}
-        </section>
-      ) : selected ? (
-        <section className="card">
-          <button className="link" onClick={() => setSelected(null)}>
-            ← voltar
-          </button>
-          <h2>{selected.name}</h2>
-          <p className="muted">
-            {selected.venue} · {selected.city} · {dateTime(selected.startsAt)}
-          </p>
-
-          <ul className="categories">
-            {selected.categories.map((category) => (
-              <li key={category.id}>
-                <div>
-                  <strong>{category.name}</strong>
-                  <span className="muted"> · {money(category.price)}</span>
-                  <div className="muted small">{category.availableQuantity} disponíveis</div>
-                </div>
-                <div className="actions">
-                  {[1, 2].map((quantity) => (
-                    <button
-                      key={quantity}
-                      disabled={placing || category.availableQuantity < quantity}
-                      onClick={() => buy(category.id, quantity)}
-                    >
-                      comprar {quantity}
-                    </button>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <section className="grid">
-          {events.map((event) => (
-            <button key={event.id} className="card event" onClick={() => openEvent(event.id)}>
-              <strong>{event.name}</strong>
-              <span className="muted">
-                {event.venue} · {event.city}
-              </span>
-              <span className="muted small">{dateTime(event.startsAt)}</span>
-              {event.priceFrom && <span className="price">a partir de {money(event.priceFrom)}</span>}
-            </button>
-          ))}
-          {events.length === 0 && !error && <p className="muted">Nenhum evento à venda.</p>}
-        </section>
-      )}
-    </main>
+      <footer className="site-footer">
+        <div className="shell">
+          <span>TicketFlow · projeto de portfólio</span>
+          <span className="muted small">
+            Pedido aceito em milissegundos, pagamento resolvido de forma assíncrona
+          </span>
+        </div>
+      </footer>
+    </div>
   );
 }

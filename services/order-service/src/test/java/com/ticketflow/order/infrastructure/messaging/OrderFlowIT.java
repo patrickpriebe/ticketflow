@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "ticketflow.outbox.scheduling-enabled=false",
+        "ticketflow.auth.secret=" + com.ticketflow.order.support.OrderServiceIT.TEST_SECRET,
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.cloud.stream.kafka.bindings.paymentProcessed-in-0.consumer.start-offset=earliest"
 })
@@ -92,6 +93,7 @@ class OrderFlowIT extends OrderServiceIT {
     private UUID placeOrder(UUID categoryId, int quantity) throws Exception {
         String response = mockMvc.perform(post("/api/v1/orders")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .header("Authorization", bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(orderBody(categoryId, quantity)))
                 .andExpect(status().isAccepted())

@@ -92,6 +92,14 @@ springdoc:
     url: /order-service.yaml
 
 ticketflow:
+  auth:
+    # Segredo de DESENVOLVIMENTO. Em qualquer ambiente real isto vira
+    # spring.security.oauth2.resourceserver.jwt.issuer-uri apontando para o
+    # provedor de identidade, e este valor deixa de existir.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+    # Endpoint que emite token sem verificar nada. Só para o front local e curl.
+    dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+
   order:
     # How long an order may sit in PENDING before the expiry sweep releases it.
     payment-window: PT15M

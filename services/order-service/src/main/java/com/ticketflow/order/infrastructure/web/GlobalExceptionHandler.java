@@ -78,6 +78,13 @@ public class GlobalExceptionHandler {
                 "The request could not be parsed.", "malformed-request", request);
     }
 
+    /** Token bem assinado, mas sem as informações que a compra exige. */
+    @ExceptionHandler(com.ticketflow.order.infrastructure.security.AuthenticatedCustomer.InvalidTokenException.class)
+    public ProblemDetail handleInvalidToken(RuntimeException e, HttpServletRequest request) {
+        return problem(HttpStatus.UNAUTHORIZED, "Token inválido", e.getMessage(),
+                "invalid-token", request);
+    }
+
     /** Value objects reject bad input by throwing this - an unknown payment method, for instance. */
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {

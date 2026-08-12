@@ -10,10 +10,11 @@ extends:
   - recommended
 
 rules:
-  # The API has no authentication yet. Declaring a bearerAuth scheme that no code
-  # enforces would make the contract lie. Turn this back on the moment auth is
-  # implemented - it is listed as a known debt in the README.
-  security-defined: off
+  # `security-defined` ficou desligada enquanto a API não tinha autenticação -
+  # declarar um esquema que nenhum código aplicava faria o contrato mentir. Agora
+  # que o resource server existe e os testes cobrem 401 e acesso cruzado, a regra
+  # volta a valer e passa a proteger contra alguém adicionar um endpoint aberto
+  # sem perceber.
 
   # The only server today IS localhost: this runs locally by design.
   no-server-example.com: off

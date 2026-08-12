@@ -52,6 +52,10 @@ paths:
       tags: [Events]
       summary: List events available for sale
       operationId: listEvents
+      # Público de propósito: é a vitrine. Exigir login para ver o que está à venda
+      # afastaria comprador. A lista vazia diz isso explicitamente, em vez de deixar
+      # a ausência de `security` parecer esquecimento.
+      security: []
       parameters:
         - name: city
           in: query
@@ -82,6 +86,7 @@ paths:
       tags: [Events]
       summary: Get one event with its ticket categories and availability
       operationId: getEvent
+      security: []
       parameters:
         - $ref: '#/components/parameters/EventId'
       responses:
@@ -102,6 +107,8 @@ paths:
       tags: [Orders]
       summary: Place an order (accepted for asynchronous processing)
       operationId: createOrder
+      security:
+        - bearerAuth: []
       parameters:
         - name: Idempotency-Key
           in: header
@@ -166,13 +173,15 @@ paths:
 
     get:
       tags: [Orders]
-      summary: List a customer's orders
+      summary: List the authenticated customer's orders
+      description: |
+        Devolve sempre os pedidos de quem apresentou o token. Não existe parâmetro
+        de cliente: aceitar um permitiria listar as compras de qualquer pessoa
+        trocando um UUID na query string.
       operationId: listOrders
+      security:
+        - bearerAuth: []
       parameters:
-        - name: customerId
-          in: query
-          required: true
-          schema: { type: string, format: uuid }
         - name: status
           in: query
           schema: { $ref: '#/components/schemas/OrderStatus' }
@@ -200,7 +209,12 @@ paths:
         This is the endpoint a client polls after `POST /orders`. The
         `statusHistory` array is what the front-end renders as a progress
         timeline.
+
+        Um pedido de outro cliente responde **404**, não 403: confirmar que aquele
+        id existe já seria informação demais para quem está sondando.
       operationId: getOrder
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/OrderId'
       responses:
@@ -214,6 +228,19 @@ paths:
           $ref: '#/components/responses/NotFound'
 
 components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT emitido pelo provedor de identidade. O `sub` é o id do cliente, e é
+        dele que a API tira quem está comprando — **nunca do corpo da requisição**.
+
+        No ambiente local, `POST /api/dev/token` emite um token sem verificar nada.
+        Esse endpoint só existe com `ticketflow.auth.dev-tokens=true` e não deve
+        existir em nenhum outro lugar.
 
   parameters:
     EventId:
@@ -347,15 +374,14 @@ components:
       enum: [CREDIT_CARD, PIX, BOLETO]
 
     CreateOrderRequest:
+      description: |
+        Não carrega quem está comprando: a identidade vem do token. Aceitá-la aqui
+        reabriria exatamente o buraco que a autenticação fechou.
+
+        Também não carrega preço — esse vem do catálogo, senão o cliente escolheria
+        quanto pagar.
       type: object
       properties:
-        customer:
-          type: object
-          properties:
-            id:    { type: string, format: uuid }
-            name:  { type: string, minLength: 2, maxLength: 180 }
-            email: { type: string, format: email }
-          required: [id, name, email]
         eventId:       { type: string, format: uuid }
         paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
         items:
@@ -368,12 +394,8 @@ components:
               ticketCategoryId: { type: string, format: uuid }
               quantity:         { type: integer, minimum: 1, maximum: 10 }
             required: [ticketCategoryId, quantity]
-      required: [customer, eventId, paymentMethod, items]
+      required: [eventId, paymentMethod, items]
       example:
-        customer:
-          id: 3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10
-          name: Ana Souza
-          email: ana.souza@example.com
         eventId: 11111111-1111-4111-8111-111111111111
         paymentMethod: CREDIT_CARD
         items:

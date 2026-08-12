@@ -76,6 +76,9 @@ public class UseCaseConfiguration {
         return new GetOrder(orders);
     }
 
+    // A autorização de "só vejo o meu pedido" mora no caso de uso, não no
+    // controller: é regra de aplicação e precisa valer para qualquer entrada.
+
     @Bean
     public ListOrdersUseCase listOrdersUseCase(OrderRepository orders) {
         return new ListOrders(orders);
