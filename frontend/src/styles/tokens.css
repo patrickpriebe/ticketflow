@@ -1,0 +1,179 @@
+/* ==========================================================================
+   Tokens
+   --------------------------------------------------------------------------
+   Uma cor só é definida aqui. Nenhum componente escreve um hexadecimal: se
+   escrever, o tema escuro não alcança aquele pedaço da tela, e é sempre assim
+   que um dark mode fica pela metade.
+
+   O tema tem três estados: escolha explícita (data-theme no <html>), e o
+   padrão "sistema", que não marca nada e depende só do prefers-color-scheme.
+   Por isso a paleta clara mora no :root pelado — nunca dentro de uma media
+   query — e as media queries só *substituem* tokens.
+   ========================================================================== */
+
+:root {
+  /* --- Marca ------------------------------------------------------------ */
+  --brand-50:  #eef3ff;
+  --brand-100: #d9e4ff;
+  --brand-200: #b3c8ff;
+  --brand-500: #0052ff;
+  --brand-600: #0043d1;
+  --brand-700: #0036a8;
+
+  /* Destaque: urgência, esgotando, recusa. Usado com parcimônia — se aparece
+     em tudo, deixa de significar alguma coisa. */
+  --accent-500: #bf3003;
+  --accent-600: #9c2702;
+
+  --success-500: #0f7b4f;
+  --warning-500: #a35c00;
+
+  /* --- Superfícies ------------------------------------------------------ */
+  --bg: #ffffff;
+  --bg-subtle: #f8f9fa;
+  --bg-inset: #f1f3f5;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inverted: #121212;
+  --text-inverted: #f8f9fa;
+
+  /* --- Texto ------------------------------------------------------------ */
+  --text: #121212;
+  --text-secondary: #45484d;
+  --text-muted: #6b7078;
+  --text-on-brand: #ffffff;
+
+  /* --- Traços ----------------------------------------------------------- */
+  --border: #e3e6ea;
+  --border-strong: #cfd4da;
+  --focus-ring: color-mix(in srgb, var(--brand-500) 45%, transparent);
+
+  /* --- Sombras ---------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgb(18 18 18 / 6%), 0 1px 3px rgb(18 18 18 / 4%);
+  --shadow-md: 0 4px 12px rgb(18 18 18 / 8%), 0 2px 4px rgb(18 18 18 / 4%);
+  --shadow-lg: 0 16px 40px rgb(18 18 18 / 12%), 0 4px 12px rgb(18 18 18 / 6%);
+
+  /* --- Tipografia ------------------------------------------------------- */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+
+  /* Escala tipográfica: display para o hero, e daí para baixo. */
+  --text-display: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
+  --text-h1: clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem);
+  --text-h2: clamp(1.375rem, 1.15rem + 0.9vw, 1.75rem);
+  --text-h3: 1.125rem;
+  --text-body: 0.9375rem;
+  --text-sm: 0.8125rem;
+  --text-xs: 0.6875rem;
+
+  /* --- Espaço e forma --------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --shell-width: 1200px;
+  --header-height: 68px;
+
+  /* Uma curva só para tudo que se move. */
+  --ease: cubic-bezier(0.2, 0, 0.1, 1);
+  --duration: 160ms;
+
+  color-scheme: light;
+}
+
+/* --------------------------------------------------------------------------
+   Escuro.
+   Não é a paleta clara invertida: o azul de marca puro (#0052ff) sobre fundo
+   quase preto fica abaixo do contraste mínimo, então clareia. O fundo também
+   não é preto puro — sombra nenhuma aparece sobre #000, e a hierarquia de
+   profundidade some junto.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --brand-50: #101a33;
+    --brand-100: #16244a;
+    --brand-200: #1d3269;
+    --brand-500: #4d84ff;
+    --brand-600: #3a72f2;
+    --brand-700: #2c5fd6;
+
+    --accent-500: #ff6a3d;
+    --accent-600: #e85526;
+
+    --success-500: #35b57e;
+    --warning-500: #d99423;
+
+    --bg: #0b0b0d;
+    --bg-subtle: #121215;
+    --bg-inset: #1a1a1f;
+    --surface: #141418;
+    --surface-raised: #1c1c22;
+    --surface-inverted: #f8f9fa;
+    --text-inverted: #121212;
+
+    --text: #f2f3f5;
+    --text-secondary: #c3c7ce;
+    --text-muted: #8d939d;
+    --text-on-brand: #ffffff;
+
+    --border: #26262d;
+    --border-strong: #35353f;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
+    --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+
+    color-scheme: dark;
+  }
+}
+
+/* A escolha explícita vence os dois lados: escuro num sistema claro e
+   claro num sistema escuro. */
+:root[data-theme='dark'] {
+  --brand-50: #101a33;
+  --brand-100: #16244a;
+  --brand-200: #1d3269;
+  --brand-500: #4d84ff;
+  --brand-600: #3a72f2;
+  --brand-700: #2c5fd6;
+
+  --accent-500: #ff6a3d;
+  --accent-600: #e85526;
+
+  --success-500: #35b57e;
+  --warning-500: #d99423;
+
+  --bg: #0b0b0d;
+  --bg-subtle: #121215;
+  --bg-inset: #1a1a1f;
+  --surface: #141418;
+  --surface-raised: #1c1c22;
+  --surface-inverted: #f8f9fa;
+  --text-inverted: #121212;
+
+  --text: #f2f3f5;
+  --text-secondary: #c3c7ce;
+  --text-muted: #8d939d;
+  --text-on-brand: #ffffff;
+
+  --border: #26262d;
+  --border-strong: #35353f;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+
+  color-scheme: dark;
+}

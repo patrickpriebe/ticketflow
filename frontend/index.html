@@ -3,7 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TicketFlow</title>
+    <meta name="description" content="TicketFlow — ingressos para shows, jogos e espetáculos." />
+    <meta name="color-scheme" content="light dark" />
+    <title>TicketFlow · Ingressos para shows, jogos e espetáculos</title>
+
+    <!--
+      Inter, com fallback para a fonte do sistema. Se a rede não responder, a
+      página continua legível na fonte da própria máquina — por isso `swap` e
+      por isso a pilha de fallback no token --font-sans.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+
+    <script>
+      // Antes da primeira pintura: sem isto a página aparece clara e escurece
+      // um quadro depois, no piscar que todo site com tema escuro tem quando a
+      // preferência só é lida dentro do React.
+      (function () {
+        try {
+          var stored = localStorage.getItem('ticketflow.theme');
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (e) {
+          /* localStorage bloqueado: o CSS decide pelo prefers-color-scheme */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

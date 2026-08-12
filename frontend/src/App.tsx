@@ -1,181 +1,243 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   currentSession,
   getEvent,
   listEvents,
-  listMyOrders,
   placeOrder,
   ProblemError,
   signIn,
   signOut,
   type EventDetail,
   type EventSummary,
-  type Order,
   type PaymentMethod,
   type Session,
 } from './api';
+import { Footer } from './components/Footer';
 import { Header } from './components/Header';
-import { money } from './lib/format';
+import { Icon } from './components/Icon';
+import {
+  emptyCart,
+  loadCart,
+  saveCart,
+  toOrderItems,
+  type Cart,
+} from './lib/cart';
+import { navigate, useRoute } from './lib/router';
+import { applyPreference, storedPreference } from './lib/theme';
 import { useOrderStatus } from './useOrderStatus';
-import { Catalog } from './views/Catalog';
+import { Checkout } from './views/Checkout';
+import { Discover } from './views/Discover';
 import { EventPage } from './views/EventPage';
+import { Home } from './views/Home';
+import { MyOrders } from './views/MyOrders';
 import { OrderPage } from './views/OrderPage';
 import { SignIn } from './views/SignIn';
 
-type View =
-  | { name: 'catalog' }
-  | { name: 'event'; event: EventDetail }
-  | { name: 'order'; orderId: string }
-  | { name: 'orders' }
-  | { name: 'signin' };
-
 export default function App() {
-  const [session, setSession] = useState<Session | null>(currentSession);
-  const [view, setView] = useState<View>({ name: 'catalog' });
-  /** Para onde voltar depois do login, para não perder o que estava sendo comprado. */
-  const [returnTo, setReturnTo] = useState<View | null>(null);
-  const [events, setEvents] = useState<EventSummary[]>([]);
-  const [myOrders, setMyOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const route = useRoute();
 
-  const { order, error: pollError } = useOrderStatus(
-    view.name === 'order' ? view.orderId : null,
-  );
+  const [session, setSession] = useState<Session | null>(currentSession);
+  const [events, setEvents] = useState<EventSummary[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [cart, setCart] = useState<Cart | null>(loadCart);
+
+  const [placing, setPlacing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  /** Para onde voltar depois do login, para não perder o que estava sendo comprado. */
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  const { order, error: pollError } = useOrderStatus(route.name === 'order' ? route.id : null);
+
+  // O tema é aplicado antes de qualquer coisa aparecer, senão a primeira pintura
+  // sai clara e escurece um quadro depois.
+  useEffect(() => {
+    applyPreference(storedPreference());
+  }, []);
 
   useEffect(() => {
     listEvents()
       .then((page) => setEvents(page.content))
-      .catch(() => setError('Não foi possível carregar os eventos.'))
-      .finally(() => setLoading(false));
+      .catch(() => setCatalogError('Não foi possível carregar o catálogo. O Order Service está no ar?'))
+      .finally(() => setLoadingEvents(false));
   }, []);
 
-  const goHome = useCallback(() => {
-    setView({ name: 'catalog' });
-    setError(null);
-  }, []);
+  // Detalhe do evento: só quando a rota é de um evento e o que está carregado não
+  // é ele. Sem essa comparação, cada re-render dispararia uma requisição nova.
+  useEffect(() => {
+    if (route.name !== 'event' || event?.id === route.id) return;
 
-  const openEvent = async (eventId: string) => {
-    setError(null);
-    try {
-      setView({ name: 'event', event: await getEvent(eventId) });
-    } catch {
-      setError('Não foi possível carregar este evento.');
-    }
-  };
+    let cancelled = false;
+    setEvent(null);
+    getEvent(route.id)
+      .then((detail) => {
+        if (cancelled) return;
+        setEvent(detail);
+        // Carrinho é por evento: trocar de evento não carrega a escolha antiga junto.
+        setCart((current) => (current?.eventId === detail.id ? current : emptyCart(detail)));
+      })
+      .catch(() => !cancelled && setCatalogError('Não foi possível carregar este evento.'));
 
-  const openMyOrders = async () => {
-    setError(null);
-    try {
-      const page = await listMyOrders();
-      setMyOrders(page.content);
-      setView({ name: 'orders' });
-    } catch (e) {
-      setError(e instanceof ProblemError ? e.detail : 'Não foi possível carregar seus pedidos.');
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [route.name === 'event' ? route.id : null]);
 
-  const buy = async (ticketCategoryId: string, quantity: number, paymentMethod: PaymentMethod) => {
-    if (view.name !== 'event') return;
-
-    // Comprar exige sessão. Mandar para o login em vez de deixar a API responder
-    // 401 e mostrar um erro seco - e guardar o evento, para que entrar não custe
-    // ao cliente refazer o caminho todo.
-    if (!session) {
-      setReturnTo(view);
-      setView({ name: 'signin' });
-      return;
-    }
-
-    setPlacing(true);
-    setError(null);
-    try {
-      const created = await placeOrder({
-        eventId: view.event.id,
-        ticketCategoryId,
-        quantity,
-        paymentMethod,
-      });
-      setView({ name: 'order', orderId: created.id });
-    } catch (e) {
-      // Um 409 de estoque chega com o texto do backend, que já diz quantos restam.
-      setError(e instanceof ProblemError ? `${e.title}: ${e.detail}` : 'Não foi possível criar o pedido.');
-    } finally {
-      setPlacing(false);
-    }
-  };
+  useEffect(() => {
+    saveCart(cart);
+  }, [cart]);
 
   const doSignIn = async (name: string, email: string) => {
     setSession(await signIn(name, email));
-    // Volta para onde a pessoa estava, com o evento já aberto.
-    setView(returnTo ?? { name: 'catalog' });
+    navigate(returnTo ?? '/', { replace: true });
     setReturnTo(null);
   };
 
   const doSignOut = () => {
     signOut();
     setSession(null);
-    goHome();
+    navigate('/');
+  };
+
+  const confirmOrder = async (paymentMethod: PaymentMethod) => {
+    if (!cart || cart.lines.length === 0) return;
+
+    // Comprar exige sessão. Mandar para o login em vez de deixar a API responder
+    // 401 e mostrar um erro seco — e guardar o caminho, para que entrar não custe
+    // à pessoa refazer a escolha toda.
+    if (!session) {
+      setReturnTo('/checkout');
+      navigate('/signin');
+      return;
+    }
+
+    setPlacing(true);
+    setCheckoutError(null);
+    try {
+      const created = await placeOrder({
+        eventId: cart.eventId,
+        items: toOrderItems(cart),
+        paymentMethod,
+      });
+      setCart(null);
+      navigate(`/orders/${created.id}`);
+    } catch (e) {
+      // Um 409 de estoque chega com o texto do backend, que já diz quantos restam.
+      setCheckoutError(
+        e instanceof ProblemError ? `${e.title}: ${e.detail}` : 'Não foi possível criar o pedido.',
+      );
+    } finally {
+      setPlacing(false);
+    }
   };
 
   return (
     <div className="app">
-      <Header session={session} onHome={goHome} onMyOrders={openMyOrders} onSignOut={doSignOut} />
+      <Header session={session} route={route} onSignOut={doSignOut} />
 
       <main>
-        {error && view.name !== 'order' && (
-          <div className="shell">
-            <p className="alert">{error}</p>
+        {catalogError && route.name !== 'order' && (
+          <div className="shell" style={{ paddingTop: 'var(--space-5)' }}>
+            <p className="alert">
+              <Icon name="close" size={18} />
+              {catalogError}
+            </p>
           </div>
         )}
 
-        {view.name === 'catalog' && (
-          <Catalog events={events} loading={loading} onOpen={openEvent} />
+        {route.name === 'home' && <Home events={events} loading={loadingEvents} />}
+
+        {route.name === 'events' && <Discover allEvents={events} query={route.query} />}
+
+        {route.name === 'event' &&
+          (event && cart ? (
+            <EventPage event={event} cart={cart} onCart={setCart} />
+          ) : (
+            <LoadingEvent />
+          ))}
+
+        {route.name === 'checkout' &&
+          (cart && cart.lines.length > 0 ? (
+            <Checkout
+              cart={cart}
+              session={session}
+              placing={placing}
+              error={checkoutError}
+              onConfirm={confirmOrder}
+            />
+          ) : (
+            <EmptyCart />
+          ))}
+
+        {route.name === 'order' && <OrderPage order={order} error={pollError} />}
+
+        {route.name === 'orders' &&
+          (session ? (
+            <MyOrders />
+          ) : (
+            <SignIn onSignIn={doSignIn} reason="Entre para ver os pedidos feitos com esta identidade." />
+          ))}
+
+        {route.name === 'signin' && (
+          <SignIn
+            onSignIn={doSignIn}
+            reason={
+              returnTo === '/checkout'
+                ? 'Falta só identificar quem está comprando. Sua escolha de ingressos continua guardada.'
+                : undefined
+            }
+          />
         )}
 
-        {view.name === 'event' && (
-          <EventPage event={view.event} placing={placing} onBack={goHome} onBuy={buy} />
-        )}
-
-        {view.name === 'order' && (
-          <OrderPage order={order} error={pollError} onBack={goHome} />
-        )}
-
-        {view.name === 'signin' && <SignIn onSignIn={doSignIn} />}
-
-        {view.name === 'orders' && (
-          <section className="shell section narrow">
-            <h2 className="section-title">Meus pedidos</h2>
-            {myOrders.length === 0 ? (
-              <p className="empty">Você ainda não fez nenhum pedido.</p>
-            ) : (
-              <ul className="order-list">
-                {myOrders.map((o) => (
-                  <li key={o.id}>
-                    <button onClick={() => setView({ name: 'order', orderId: o.id })}>
-                      <span>
-                        <strong>{o.items.map((i) => `${i.quantity}× ${i.categoryName}`).join(', ')}</strong>
-                        <span className="muted small"> · {money(o.totalAmount)}</span>
-                      </span>
-                      <span className={`pill pill-${o.status.toLowerCase()}`}>{o.status}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
+        {route.name === 'notFound' && <NotFound />}
       </main>
 
-      <footer className="site-footer">
-        <div className="shell">
-          <span>TicketFlow · projeto de portfólio</span>
-          <span className="muted small">
-            Pedido aceito em milissegundos, pagamento resolvido de forma assíncrona
-          </span>
-        </div>
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+function LoadingEvent() {
+  return (
+    <section className="shell section">
+      <div className="skeleton" style={{ height: 320, borderRadius: 'var(--radius-lg)' }} />
+    </section>
+  );
+}
+
+function EmptyCart() {
+  return (
+    <section className="shell section narrow">
+      <div className="empty">
+        <Icon name="ticket" size={28} />
+        <div>
+          <strong>Seu carrinho está vazio.</strong>
+          <p className="small">Escolha um evento e a quantidade de ingressos para continuar.</p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => navigate('/events')}>
+          Descobrir eventos
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NotFound() {
+  return (
+    <section className="shell section narrow">
+      <div className="empty">
+        <Icon name="inbox" size={28} />
+        <div>
+          <strong>Página não encontrada.</strong>
+          <p className="small">O endereço não corresponde a nenhuma tela do TicketFlow.</p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => navigate('/')}>
+          Voltar para a home
+        </button>
+      </div>
+    </section>
   );
 }

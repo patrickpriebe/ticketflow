@@ -1,0 +1,718 @@
+/* ==========================================================================
+   Layouts de tela. Só o que é específico de uma página mora aqui.
+   ========================================================================== */
+
+/* --- Home: hero ----------------------------------------------------------- */
+
+.hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: min(560px, 70vh);
+  padding-block: var(--space-8);
+  overflow: hidden;
+  background: var(--surface-inverted);
+  text-align: center;
+}
+
+/* A arte do hero é desenhada, não fotografada: o catálogo não tem imagem e
+   inventar um campo no contrato só para o front ficar bonito seria o rabo
+   abanando o cachorro. */
+.hero-art {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #000 35%, transparent) 0%,
+    color-mix(in srgb, #000 70%, transparent) 100%
+  );
+}
+
+.hero .shell {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+.hero h1 {
+  font-size: var(--text-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: #fff;
+}
+
+.hero p {
+  margin-top: var(--space-4);
+  font-size: 1.0625rem;
+  color: rgb(255 255 255 / 78%);
+}
+
+.hero-search {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 620px;
+  margin: var(--space-6) auto 0;
+  padding: var(--space-2);
+  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(10px);
+}
+
+.hero-search .search {
+  flex: 1;
+  background: #fff;
+  border-color: transparent;
+}
+
+.hero-search .search input {
+  color: #121212;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.hero-stats div {
+  color: rgb(255 255 255 / 70%);
+  font-size: var(--text-sm);
+}
+
+.hero-stats strong {
+  display: block;
+  font-size: 1.375rem;
+  color: #fff;
+}
+
+/* --- Home: destaques ------------------------------------------------------ */
+
+.trending {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1.6fr 1fr;
+}
+
+.trending-side {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-rows: 1fr 1fr;
+}
+
+.trending .featured .event-art {
+  aspect-ratio: 16 / 9;
+}
+
+.trending .featured h3 {
+  font-size: 1.5rem;
+}
+
+.trending-side .event-card {
+  flex-direction: row;
+}
+
+.trending-side .event-art {
+  flex-shrink: 0;
+  width: 40%;
+  aspect-ratio: auto;
+}
+
+.card-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Faixa de argumentos: por que comprar aqui. Também é onde a arquitetura
+   aparece para quem só olha a tela. */
+.pitch {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  padding: var(--space-6);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.pitch-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pitch-item .icon-badge {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--brand-50);
+  color: var(--brand-500);
+}
+
+.pitch-item h3 {
+  font-size: var(--text-body);
+}
+
+.pitch-item p {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* --- Descobrir ------------------------------------------------------------ */
+
+.discover {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: 240px 1fr;
+  align-items: start;
+}
+
+.filters {
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.filter-group h4 {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.filter-group .range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.filter-group .range .input {
+  padding: 0.375rem 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  background: var(--brand-50);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--brand-500);
+}
+
+/* --- Página do evento ----------------------------------------------------- */
+
+.event-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 380px;
+  padding-block: var(--space-6);
+  overflow: hidden;
+  background: var(--surface-inverted);
+}
+
+.event-hero .hero-art {
+  opacity: 0.7;
+}
+
+.event-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #000 20%, transparent) 0%,
+    color-mix(in srgb, #000 78%, transparent) 100%
+  );
+}
+
+.event-hero .shell {
+  position: relative;
+  z-index: 1;
+}
+
+.event-hero h1 {
+  max-width: 22ch;
+  color: #fff;
+}
+
+.event-hero .back {
+  margin-bottom: var(--space-5);
+  color: rgb(255 255 255 / 80%);
+}
+
+.event-hero .back:hover {
+  color: #fff;
+}
+
+.event-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  color: rgb(255 255 255 / 82%);
+  font-size: var(--text-sm);
+}
+
+.event-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.event-tags {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.two-col {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: 1fr 380px;
+  align-items: start;
+}
+
+.prose p + p {
+  margin-top: var(--space-4);
+}
+
+.prose p {
+  color: var(--text-secondary);
+}
+
+.block + .block {
+  margin-top: var(--space-7);
+}
+
+.venue-card {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 200px 1fr;
+  padding: var(--space-5);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.venue-map {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-inset);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.venue-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.venue-facts li {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* --- Seletor de ingressos ------------------------------------------------- */
+
+.buy-panel {
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.buy-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+
+.tier.chosen {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+}
+
+.tier.sold-out {
+  opacity: 0.55;
+}
+
+.tier-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tier-info strong {
+  font-size: var(--text-body);
+}
+
+.tier-price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tier-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+}
+
+/* Contador de quantidade. É um grupo de botões, não um <input type=number>:
+   o spinner nativo tem alvo minúsculo e visual diferente em cada navegador. */
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+}
+
+.qty button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.qty button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qty strong {
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.summary-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.fine-print {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* --- Checkout ------------------------------------------------------------- */
+
+.checkout {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: 1fr 360px;
+  align-items: start;
+}
+
+.method {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+
+.method:hover {
+  border-color: var(--border-strong);
+}
+
+.method.chosen {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+}
+
+.method .radio {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.method.chosen .radio {
+  border-color: var(--brand-500);
+  border-width: 5px;
+}
+
+.method-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+}
+
+.method.chosen .method-icon {
+  background: var(--brand-500);
+  color: var(--text-on-brand);
+}
+
+.method-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.method-detail {
+  padding: var(--space-4);
+  margin-top: var(--space-3);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.order-summary {
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.summary-event {
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* --- Meus pedidos --------------------------------------------------------- */
+
+.narrow {
+  max-width: 780px;
+  margin-inline: auto;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab {
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--brand-500);
+  border-bottom-color: var(--brand-500);
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+
+.order-row:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.order-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* --- Entrar --------------------------------------------------------------- */
+
+.auth-card {
+  max-width: 420px;
+  margin: var(--space-8) auto;
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+/* --- Responsivo ----------------------------------------------------------- */
+
+@media (max-width: 1000px) {
+  .two-col,
+  .checkout,
+  .discover {
+    grid-template-columns: 1fr;
+  }
+
+  .buy-panel,
+  .order-summary,
+  .filters {
+    position: static;
+  }
+
+  .trending {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .header-search {
+    display: none;
+  }
+
+  .header-inner {
+    gap: var(--space-3);
+  }
+
+  .venue-card {
+    grid-template-columns: 1fr;
+  }
+
+  .trending-side .event-card {
+    flex-direction: column;
+  }
+
+  .trending-side .event-art {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+  }
+
+  .stub-top,
+  .stub-bottom {
+    padding: var(--space-4);
+  }
+}

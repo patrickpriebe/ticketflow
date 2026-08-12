@@ -31,6 +31,8 @@ export interface TicketCategory {
 }
 
 export interface EventDetail extends EventSummary {
+  /** Opcional no contrato: nem todo evento do catálogo tem texto de apresentação. */
+  description?: string;
   salesStartAt: string;
   salesEndAt: string;
   categories: TicketCategory[];
@@ -56,7 +58,7 @@ export interface Order {
   createdAt: string;
 }
 
-interface Page<T> {
+export interface Page<T> {
   content: T[];
   page: { totalElements: number };
 }
@@ -159,8 +161,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function listEvents(): Promise<Page<EventSummary>> {
-  return request<Page<EventSummary>>('/api/v1/events?status=ON_SALE');
+/** Só o que os parâmetros do catálogo aceitam de verdade — o resto o front filtra. */
+export interface EventFilters {
+  city?: string;
+  page?: number;
+  size?: number;
+}
+
+export function listEvents(filters: EventFilters = {}): Promise<Page<EventSummary>> {
+  const query = new URLSearchParams();
+  // Sempre ON_SALE: o endpoint é público e aceita o status como parâmetro, mas
+  // um evento em DRAFT ainda está sendo montado e não é para ser visto.
+  query.set('status', 'ON_SALE');
+  if (filters.city) query.set('city', filters.city);
+  if (filters.page !== undefined) query.set('page', String(filters.page));
+  if (filters.size !== undefined) query.set('size', String(filters.size));
+
+  return request<Page<EventSummary>>(`/api/v1/events?${query}`);
 }
 
 export function getEvent(eventId: string): Promise<EventDetail> {
@@ -171,16 +188,22 @@ export function getOrder(orderId: string): Promise<Order> {
   return request<Order>(`/api/v1/orders/${orderId}`);
 }
 
-export function listMyOrders(): Promise<Page<Order>> {
-  return request<Page<Order>>('/api/v1/orders');
+export function listMyOrders(status?: OrderStatus): Promise<Page<Order>> {
+  const query = status ? `?status=${status}` : '';
+  return request<Page<Order>>(`/api/v1/orders${query}`);
 }
 
 export type PaymentMethod = 'CREDIT_CARD' | 'PIX' | 'BOLETO';
 
-export interface PlaceOrderInput {
-  eventId: string;
+export interface OrderItemInput {
   ticketCategoryId: string;
   quantity: number;
+}
+
+export interface PlaceOrderInput {
+  eventId: string;
+  /** Até 10 categorias no mesmo pedido, como o contrato permite. */
+  items: OrderItemInput[];
   paymentMethod: PaymentMethod;
 }
 
@@ -195,7 +218,7 @@ export function placeOrder(input: PlaceOrderInput): Promise<Order> {
     body: JSON.stringify({
       eventId: input.eventId,
       paymentMethod: input.paymentMethod,
-      items: [{ ticketCategoryId: input.ticketCategoryId, quantity: input.quantity }],
+      items: input.items,
     }),
   });
 }

@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { listTickets, type Order, type OrderStatus, type Ticket } from '../api';
 import { Countdown } from '../components/Countdown';
+import { Icon } from '../components/Icon';
+import { Stepper } from '../components/Stepper';
 import { TicketList } from '../components/TicketList';
 import { dateTime, money } from '../lib/format';
+import { linkProps } from '../lib/router';
 
 interface Props {
   order: Order | null;
   error: string | null;
-  onBack: () => void;
 }
 
 const METHOD_LABEL: Record<string, string> = {
   CREDIT_CARD: 'Cartão de crédito',
   PIX: 'PIX',
-  BOLETO: 'Boleto',
+  BOLETO: 'Boleto bancário',
 };
 
 /**
@@ -36,7 +38,7 @@ const STATUS: Record<OrderStatus, { label: string; headline: string; hint: strin
   REJECTED: {
     label: 'Recusado',
     headline: 'Não foi dessa vez',
-    hint: 'A operadora do cartão não autorizou a cobrança. Seus ingressos voltaram para o estoque.',
+    hint: 'A operadora não autorizou a cobrança. Seus ingressos voltaram para o estoque.',
     tone: 'rejected',
   },
   CANCELLED: {
@@ -53,7 +55,7 @@ const STATUS: Record<OrderStatus, { label: string; headline: string; hint: strin
   },
 };
 
-export function OrderPage({ order, error, onBack }: Props) {
+export function OrderPage({ order, error }: Props) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const paid = order?.status === 'PAID';
 
@@ -75,8 +77,17 @@ export function OrderPage({ order, error, onBack }: Props) {
 
   if (!order) {
     return (
-      <section className="shell section">
-        {error ? <p className="alert">{error}</p> : <p className="muted">Carregando pedido…</p>}
+      <section className="shell section narrow">
+        {error ? (
+          <p className="alert">
+            <Icon name="close" size={18} />
+            {error}
+          </p>
+        ) : (
+          <div className="stack">
+            <div className="skeleton" style={{ height: 260, borderRadius: 'var(--radius-lg)' }} />
+          </div>
+        )}
       </section>
     );
   }
@@ -85,24 +96,26 @@ export function OrderPage({ order, error, onBack }: Props) {
 
   return (
     <section className="shell section narrow">
-      <button className="back dark" onClick={onBack}>
-        ← Voltar para os eventos
-      </button>
+      <Stepper current={3} />
 
       {/* O canhoto: a metade de cima é o pedido, a de baixo o acompanhamento,
           separadas pela linha picotada — é a forma que todo mundo reconhece. */}
-      <article className={`stub tone-${status.tone}`}>
+      <article className="stub">
         <div className="stub-top">
           <div className="stub-head">
-            <span className="muted small">Pedido {order.id.slice(0, 8).toUpperCase()}</span>
+            <span className="stub-code">PEDIDO {order.id.slice(0, 8).toUpperCase()}</span>
             <span className={`pill pill-${status.tone}`}>
               {order.status === 'PENDING' && <span className="dot" aria-hidden="true" />}
               {status.label}
             </span>
           </div>
 
-          <h2>{status.headline}</h2>
-          <p className="muted">{status.hint}</p>
+          <div>
+            <h1>{status.headline}</h1>
+            <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
+              {status.hint}
+            </p>
+          </div>
 
           <ul className="stub-items">
             {order.items.map((item, i) => (
@@ -118,7 +131,9 @@ export function OrderPage({ order, error, onBack }: Props) {
           <div className="stub-total">
             <div>
               <span>Total</span>
-              <div className="muted small">{METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod}</div>
+              <div className="muted small" style={{ fontWeight: 400 }}>
+                {METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod}
+              </div>
             </div>
             <strong>{money(order.totalAmount)}</strong>
           </div>
@@ -143,32 +158,48 @@ export function OrderPage({ order, error, onBack }: Props) {
         <div className="stub-bottom">
           <TicketList tickets={tickets} />
 
-          <h3>Acompanhamento</h3>
-          <ol className="timeline">
-            {order.statusHistory.map((change, i) => {
-              const isLast = i === order.statusHistory.length - 1;
-              return (
-                <li key={i} className={isLast ? 'current' : ''}>
-                  <span className="bullet" aria-hidden="true" />
-                  <div>
-                    <strong>{STATUS[change.toStatus].label}</strong>
-                    <span className="muted small"> · {dateTime(change.occurredAt)}</span>
-                    {change.reason && <div className="reason">{change.reason}</div>}
-                  </div>
+          <div>
+            <h3>Acompanhamento</h3>
+            <ol className="timeline">
+              {order.statusHistory.map((change, i) => {
+                const isLast = i === order.statusHistory.length - 1;
+                return (
+                  <li key={i} className={isLast ? 'current' : ''}>
+                    <span className="bullet" aria-hidden="true" />
+                    <div>
+                      <strong>{STATUS[change.toStatus].label}</strong>
+                      <span className="muted small"> · {dateTime(change.occurredAt)}</span>
+                      {change.reason && <div className="reason">{change.reason}</div>}
+                    </div>
+                  </li>
+                );
+              })}
+              {order.status === 'PENDING' && (
+                <li className="waiting">
+                  <span className="bullet pulsing" aria-hidden="true" />
+                  <div className="muted">Aguardando resposta do pagamento…</div>
                 </li>
-              );
-            })}
-            {order.status === 'PENDING' && (
-              <li className="waiting">
-                <span className="bullet pulsing" aria-hidden="true" />
-                <div className="muted">Aguardando resposta do pagamento…</div>
-              </li>
-            )}
-          </ol>
+              )}
+            </ol>
+          </div>
         </div>
       </article>
 
-      {error && <p className="alert soft">{error}</p>}
+      {error && (
+        <p className="note" style={{ marginTop: 'var(--space-4)' }}>
+          <Icon name="clock" size={16} />
+          {error}
+        </p>
+      )}
+
+      <div className="row" style={{ justifyContent: 'center', marginTop: 'var(--space-6)' }}>
+        <a className="btn btn-secondary" {...linkProps('/events')}>
+          Ver outros eventos
+        </a>
+        <a className="btn btn-ghost" {...linkProps('/orders')}>
+          Meus pedidos
+        </a>
+      </div>
     </section>
   );
 }
