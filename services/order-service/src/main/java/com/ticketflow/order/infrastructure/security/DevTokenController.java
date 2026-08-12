@@ -47,7 +47,9 @@ public class DevTokenController {
     @PostMapping("/token")
     public TokenResponse issue(@RequestBody(required = false) TokenRequest request) {
         TokenRequest payload = request == null ? TokenRequest.anonymous() : request;
-        UUID customerId = payload.customerId() == null ? UUID.randomUUID() : payload.customerId();
+        UUID customerId = payload.customerId() == null
+                ? stableIdFor(payload.emailOrDefault())
+                : payload.customerId();
         Instant now = Instant.now();
 
         try {
@@ -69,6 +71,22 @@ public class DevTokenController {
         } catch (JOSEException e) {
             throw new IllegalStateException("Falha ao assinar o token de desenvolvimento", e);
         }
+    }
+
+    /**
+     * O mesmo e-mail devolve sempre o mesmo cliente.
+     *
+     * <p>Com {@code UUID.randomUUID()} cada entrada criava um cliente novo: sair e
+     * voltar com o mesmo e-mail apagava o histórico de pedidos da tela, porque os
+     * pedidos continuavam lá, presos ao id anterior. Um provedor de identidade de
+     * verdade mantém o {@code sub} estável para a mesma pessoa, e é esse
+     * comportamento que se quer imitar aqui.
+     *
+     * <p>UUID versão 3 (MD5) — a escolha do algoritmo aqui não tem função de
+     * segurança, só de estabilidade.
+     */
+    static UUID stableIdFor(String email) {
+        return UUID.nameUUIDFromBytes(email.trim().toLowerCase().getBytes(StandardCharsets.UTF_8));
     }
 
     public record TokenRequest(UUID customerId, String name, String email) {

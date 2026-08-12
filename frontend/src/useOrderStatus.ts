@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getOrder, type Order } from './api';
+import { getOrder, ProblemError, type Order } from './api';
 
 /**
  * Acompanha um pedido até ele sair de PENDING.
@@ -39,7 +39,15 @@ export function useOrderStatus(orderId: string | null, intervalMs = 2000) {
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Falha ao consultar o pedido');
-        // Continua tentando: um erro de rede não significa que o pedido sumiu.
+
+        // 404 e 401 são respostas definitivas: o pedido não é desta pessoa, ou
+        // não existe. Insistir só gera requisição para sempre — foi o que
+        // aconteceu ao abrir um pedido de outro cliente, com o console enchendo
+        // de 404 a cada dois segundos.
+        const definitive = e instanceof ProblemError && (e.status === 404 || e.status === 401);
+        if (definitive) return;
+
+        // Erro de rede é outra coisa: aí sim vale tentar de novo, mais devagar.
         timer = window.setTimeout(poll, intervalMs * 2);
       }
     };
