@@ -191,3 +191,49 @@ ticketflow:
     # Mesma escolha do perfil `local`: o compose é ambiente de demonstração.
     secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
     dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+
+---
+# Nuvem gerenciada: Supabase (Postgres) e Redpanda (Kafka).
+#
+# NENHUM valor padrão aqui, de propósito — a mesma regra do perfil `kubernetes`.
+# Variável ausente derruba o boot, o que é muito melhor que subir apontando para
+# algo não intencional ou com uma credencial de exemplo.
+#
+# Nada de segredo neste arquivo: ele vai para o GitHub. Os valores vivem no
+# `.env` (ignorado pelo git) em desenvolvimento e no painel do provedor em
+# produção.
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  datasource:
+    # Supabase: usar o *session pooler* (porta 5432 no host pooler.supabase.com).
+    #
+    # A conexão direta `db.<ref>.supabase.co` só responde em IPv6, e o Render sai
+    # por IPv4 — de lá ela simplesmente não conecta. O transaction pooler (6543)
+    # resolveria o IPv4, mas roda o PgBouncer em modo transação, onde prepared
+    # statements quebram e o Hibernate para de funcionar de um jeito que o erro
+    # não denuncia. O session pooler é proxiado por IPv4 e mantém a sessão.
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+    security:
+      protocol: SASL_SSL
+    properties:
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >-
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
+  flyway:
+    # Sem `db/seed`: o catálogo de demonstração não entra num ambiente publicado.
+    # O caminho para cadastrar evento é administrativo, não migration.
+    locations: classpath:db/migration
+
+ticketflow:
+  auth:
+    secret: ${TICKETFLOW_AUTH_SECRET}
+    # O emissor de token sem senha nunca sobe aqui. O padrão da configuração base
+    # já é `false`; esta linha existe para que a intenção fique escrita.
+    dev-tokens: false

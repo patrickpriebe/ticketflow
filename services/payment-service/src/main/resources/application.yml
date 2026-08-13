@@ -126,3 +126,37 @@ spring:
 ticketflow:
   gateway:
     base-url: http://payment-gateway:8080
+
+---
+# Nuvem gerenciada: Neon (Postgres) e Redpanda (Kafka).
+#
+# O Payment Service tem banco próprio, num provedor diferente do Order Service.
+# Não é capricho: banco por serviço é o ponto, e o plano gratuito do Supabase só
+# permite dois projetos ativos. Separar de verdade custou uma conta a mais e
+# manteve a propriedade dos dados onde ela deve estar.
+#
+# Sem valores padrão: variável ausente derruba o boot.
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  datasource:
+    # Neon exige TLS — a URL precisa carregar `?sslmode=require`.
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+    security:
+      protocol: SASL_SSL
+    properties:
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >-
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
+
+ticketflow:
+  gateway:
+    # Continua sendo o gateway simulado até a fase do Stripe. A troca é de URL e
+    # de estratégia — o resto do serviço não sabe quem está do outro lado.
+    base-url: ${TICKETFLOW_GATEWAY_BASE_URL}

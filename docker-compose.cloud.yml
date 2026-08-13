@@ -1,0 +1,97 @@
+# =============================================================================
+# Os três serviços rodando LOCALMENTE, apontando para a nuvem gerenciada.
+#
+#   docker compose -f docker-compose.cloud.yml up -d --build
+#
+# Este é o passo que separa "não funciona" em duas perguntas respondíveis: se
+# quebrar aqui, é credencial, rede ou configuração — hospedagem ainda não entrou
+# na história. Depurar hospedagem e conectividade ao mesmo tempo é como se perde
+# uma tarde.
+#
+# Nenhum valor mora neste arquivo: tudo vem do `.env`, que o git ignora. Se uma
+# variável faltar, o Compose avisa e o serviço não sobe — que é o comportamento
+# desejado, porque os perfis `cloud` também não têm padrão nenhum.
+#
+# O gateway de pagamento continua sendo o Wiremock local: trocar por Stripe é
+# outra fase, e misturar as duas mudanças esconderia qual delas quebrou.
+# =============================================================================
+
+services:
+  order-service:
+    # O contexto é a raiz: os Dockerfiles copiam `services/<nome>/src`, então
+    # apontar para a pasta do serviço faz o COPY não encontrar nada.
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    container_name: ticketflow-order-service-cloud
+    environment:
+      SPRING_PROFILES_ACTIVE: cloud
+      POSTGRES_URL: ${POSTGRES_ORDERS_URL}
+      POSTGRES_USER: ${POSTGRES_ORDERS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ORDERS_PASSWORD}
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_USER: ${KAFKA_USER}
+      KAFKA_PASSWORD: ${KAFKA_PASSWORD}
+      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET}
+      # 512 MB é o tamanho da instância gratuita do Render. Sem isto a JVM
+      # calcula o heap pelo que enxerga da máquina e o contêiner morre por
+      # memória lá, não aqui — melhor descobrir agora.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    # O Order Service escuta na 8080 dentro do contêiner; 8081 é só a porta de
+    # host, escolhida porque a 8080 já é usada por outra coisa nesta máquina.
+    ports:
+      - "${ORDER_SERVICE_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    container_name: ticketflow-payment-service-cloud
+    depends_on:
+      payment-gateway:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: cloud
+      POSTGRES_URL: ${POSTGRES_PAYMENTS_URL}
+      POSTGRES_USER: ${POSTGRES_PAYMENTS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PAYMENTS_PASSWORD}
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_USER: ${KAFKA_USER}
+      KAFKA_PASSWORD: ${KAFKA_PASSWORD}
+      TICKETFLOW_GATEWAY_BASE_URL: http://payment-gateway:8080
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8082}:8082"
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: ticketflow-notification-service-cloud
+    environment:
+      SPRING_PROFILES_ACTIVE: cloud
+      MONGO_URI: ${MONGO_URI}
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_USER: ${KAFKA_USER}
+      KAFKA_PASSWORD: ${KAFKA_PASSWORD}
+      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8083}:8083"
+
+  # O gateway simulado continua local. É o único contêiner de infraestrutura que
+  # sobrevive nesta configuração, e some quando o Stripe entrar.
+  payment-gateway:
+    image: wiremock/wiremock:3.9.1
+    container_name: ticketflow-payment-gateway-cloud
+    command: ["--global-response-templating", "--verbose"]
+    volumes:
+      - ./infra/wiremock/mappings:/home/wiremock/mappings:ro
+    ports:
+      - "${PAYMENT_GATEWAY_PORT:-8090}:8080"

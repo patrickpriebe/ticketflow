@@ -124,3 +124,35 @@ ticketflow:
     enabled: ${TICKETFLOW_ARCHIVE_ENABLED:false}
     endpoint: http://localstack:4566
     bucket: ticketflow-tickets
+
+---
+# Nuvem gerenciada: MongoDB Atlas e Redpanda (Kafka).
+#
+# Sem valores padrão: variável ausente derruba o boot.
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  data:
+    mongodb:
+      # A URI do Atlas usa `mongodb+srv://` e já vem com TLS ligado. Ela carrega
+      # usuário e senha, então é segredo inteiro — nunca literal neste arquivo.
+      uri: ${MONGO_URI}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP}
+    security:
+      protocol: SASL_SSL
+    properties:
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >-
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
+
+ticketflow:
+  auth:
+    # O mesmo segredo do Order Service: os dois validam o token do mesmo emissor.
+    # Quando o Google entrar, os dois trocam isto por `issuer-uri` ao mesmo tempo.
+    secret: ${TICKETFLOW_AUTH_SECRET}
+  archive:
+    # Desligado até existir um bucket de verdade. Ver a fase 6 do roadmap.
+    enabled: ${TICKETFLOW_ARCHIVE_ENABLED:false}
