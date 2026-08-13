@@ -60,6 +60,18 @@ public interface PaymentGateway {
                     null, null, httpStatus, latencyMs, raw);
         }
 
+        /**
+         * The provider took the charge; the answer comes later, by webhook.
+         *
+         * <p>The transaction id is mandatory here even though nothing was decided:
+         * it is the only way the webhook will find this payment again.
+         */
+        public static AuthorizationResponse accepted(String transactionId, int httpStatus,
+                                                     int latencyMs, String raw) {
+            return new AuthorizationResponse(AttemptOutcome.ACCEPTED, transactionId,
+                    null, null, httpStatus, latencyMs, raw);
+        }
+
         public static AuthorizationResponse rejected(String failureCode, String failureReason,
                                                      int httpStatus, int latencyMs, String raw) {
             return new AuthorizationResponse(AttemptOutcome.REJECTED, null,

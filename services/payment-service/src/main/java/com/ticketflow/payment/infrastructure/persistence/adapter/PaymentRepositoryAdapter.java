@@ -37,6 +37,13 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Payment> findByGatewayTransaction(String gatewayName, String transactionId) {
+        return payments.findByGatewayNameAndGatewayTransactionId(gatewayName, transactionId)
+                .map(PaymentRepositoryAdapter::toDomain);
+    }
+
+    @Override
     public Payment save(Payment payment) {
         entityManager.persist(toEntity(payment));
         // Surfaces the UNIQUE on order_id now rather than at commit, so a duplicate

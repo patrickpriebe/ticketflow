@@ -69,12 +69,31 @@ management:
 
 ticketflow:
   gateway:
+    # `http` usa o gateway simulado; `stripe` usa o provedor de verdade. Os dois
+    # implementam a mesma porta e o caso de uso não sabe a diferença.
+    #
+    # O padrão é o simulado de propósito: quem clona o repositório consegue rodar
+    # o sistema inteiro sem ter conta em provedor nenhum.
+    provider: ${TICKETFLOW_GATEWAY_PROVIDER:http}
     name: acme-payments
     base-url: http://localhost:8090
     connect-timeout: 2s
     # Deliberately short. A payment worker that waits a minute on a dead provider
     # just piles up unprocessed orders.
     read-timeout: 5s
+  stripe:
+    # Sem padrão: se o provedor for `stripe` e a chave faltar, o boot cai. Deixar
+    # um valor vazio faria o serviço subir e só falhar na primeira cobrança.
+    secret-key: ${STRIPE_SECRET_KEY:}
+    # Sem ele o webhook não verifica assinatura e recusa tudo — que é o
+    # comportamento certo, porque aceitar sem verificar é uma porta aberta para
+    # forjar aprovação de pagamento.
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    # Confirma o cartão na hora com um meio de pagamento fictício do Stripe, para
+    # o ciclo fechar sem navegador. Vazio em produção: lá a confirmação acontece
+    # no Stripe Elements e o cartão nunca passa por este serviço.
+    test-card-payment-method: ${STRIPE_TEST_CARD:}
+
   outbox:
     poll-interval: 1000
     batch-size: 50

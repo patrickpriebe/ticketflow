@@ -93,6 +93,21 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            SDK oficial do Stripe. A alternativa seria montar as chamadas com o
+            RestClient que já existe aqui, e ela foi descartada por um motivo
+            específico: a verificação de assinatura do webhook. Ela é comparação
+            em tempo constante sobre um HMAC do corpo bruto, com tolerância de
+            horário, e reimplementar isso à mão é onde se erra silenciosamente —
+            um erro que só aparece quando alguém forja uma aprovação.
+        -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <!-- Última estável no Maven Central; as `-beta` ficam de fora. -->
+            <version>29.2.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

@@ -82,6 +82,39 @@ public class Payment {
      *
      * @param attempt the call that was just made; kept for the audit trail
      */
+    /**
+     * The provider took the charge and will answer later, by webhook.
+     *
+     * <p>Deliberately not a status change: the payment stays PENDING, because
+     * nothing was decided. What it does record is the provider's transaction id,
+     * and that is the whole point — it is the only handle the webhook has to find
+     * this payment again when the answer finally arrives.
+     *
+     * <p>Calling this twice is harmless: the second delivery of the same message
+     * finds the payment already carrying the id and only adds an attempt.
+     */
+    public void awaitProviderConfirmation(PaymentAttempt attempt, String gatewayName,
+                                          String transactionId, Instant now) {
+        Objects.requireNonNull(attempt, "attempt is required");
+        Objects.requireNonNull(now, "now is required");
+
+        if (transactionId == null || transactionId.isBlank()) {
+            // Without it the webhook cannot match the event back to this payment,
+            // and the money would move with nobody updating the order.
+            throw new IllegalArgumentException(
+                    "A payment awaiting confirmation must carry the provider's transaction id");
+        }
+        if (status != PaymentStatus.PENDING) {
+            throw new InvalidPaymentStatusTransitionException(status, PaymentStatus.PENDING);
+        }
+
+        this.newAttempts.add(attempt);
+        this.attempts++;
+        this.gatewayName = gatewayName;
+        this.gatewayTransactionId = transactionId;
+        this.updatedAt = now;
+    }
+
     public void applyGatewayOutcome(PaymentAttempt attempt, String gatewayName,
                                     String transactionId, String failureCode,
                                     String failureReason, Instant now) {
@@ -93,6 +126,10 @@ public class Payment {
             case REJECTED -> PaymentStatus.REJECTED;
             // No usable answer: the payment is not refused, it is unresolved.
             case TIMEOUT, ERROR -> PaymentStatus.FAILED;
+            // ACCEPTED is not an outcome that settles anything, so it must not
+            // reach here. It goes through awaitProviderConfirmation instead.
+            case ACCEPTED -> throw new IllegalArgumentException(
+                    "ACCEPTED does not settle a payment; use awaitProviderConfirmation");
         };
 
         if (!status.canTransitionTo(target)) {

@@ -127,6 +127,18 @@ public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
                 response.rawResponse(),
                 response.failureReason());
 
+        if (response.outcome() == AttemptOutcome.ACCEPTED) {
+            // The provider took it and will answer by webhook. The inbox entry is
+            // written so this ORDER_CREATED stops being redelivered — the work it
+            // asked for is done. What is deliberately NOT done is publishing: there
+            // is no outcome to announce yet, and inventing one here would confirm a
+            // boleto before anyone paid it.
+            payment.awaitProviderConfirmation(attempt, gatewayName, response.transactionId(), now);
+            payments.update(payment);
+            processedEvents.record(command.eventId());
+            return Result.AWAITING_PROVIDER;
+        }
+
         payment.applyGatewayOutcome(attempt, gatewayName, response.transactionId(),
                 response.failureCode(), response.failureReason(), now);
         payments.update(payment);

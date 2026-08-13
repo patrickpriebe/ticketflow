@@ -12,7 +12,13 @@ import com.ticketflow.payment.application.strategy.CreditCardPaymentStrategy;
 import com.ticketflow.payment.application.strategy.PaymentStrategies;
 import com.ticketflow.payment.application.strategy.PixPaymentStrategy;
 import com.ticketflow.payment.application.usecase.ProcessOrderPayment;
+import com.stripe.StripeClient;
+import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase;
+import com.ticketflow.payment.application.port.out.WebhookEventRepository;
+import com.ticketflow.payment.application.usecase.SettlePaymentFromProvider;
 import com.ticketflow.payment.infrastructure.gateway.HttpPaymentGateway;
+import com.ticketflow.payment.infrastructure.gateway.StripePaymentGateway;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +58,7 @@ public class ApplicationConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "ticketflow.gateway.provider", havingValue = "http", matchIfMissing = true)
     public RestClient gatewayRestClient(@Value("${ticketflow.gateway.base-url}") String baseUrl,
                                         @Value("${ticketflow.gateway.connect-timeout}") Duration connectTimeout,
                                         @Value("${ticketflow.gateway.read-timeout}") Duration readTimeout) {
@@ -64,11 +71,48 @@ public class ApplicationConfiguration {
         return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     }
 
+    /**
+     * O gateway simulado. Só existe quando o Stripe não está configurado, o que
+     * mantém `docker compose up` funcionando para quem clona o projeto sem ter
+     * conta em provedor nenhum.
+     */
     @Bean
-    public PaymentGateway paymentGateway(RestClient gatewayRestClient,
-                                         ObjectMapper objectMapper,
-                                         io.micrometer.core.instrument.MeterRegistry registry) {
+    @ConditionalOnProperty(name = "ticketflow.gateway.provider", havingValue = "http", matchIfMissing = true)
+    public PaymentGateway httpPaymentGateway(RestClient gatewayRestClient,
+                                             ObjectMapper objectMapper,
+                                             io.micrometer.core.instrument.MeterRegistry registry) {
         return new HttpPaymentGateway(gatewayRestClient, objectMapper, registry);
+    }
+
+    /**
+     * O provedor de verdade. Os dois adaptadores implementam a mesma porta, e o
+     * caso de uso não sabe qual dos dois recebeu — que é o motivo de a porta
+     * existir.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "ticketflow.gateway.provider", havingValue = "stripe")
+    public PaymentGateway stripePaymentGateway(
+            @Value("${ticketflow.stripe.secret-key}") String secretKey,
+            @Value("${ticketflow.stripe.test-card-payment-method:}") String testCardPaymentMethod,
+            io.micrometer.core.instrument.MeterRegistry registry) {
+
+        return new StripePaymentGateway(
+                StripeClient.builder().setApiKey(secretKey).build(),
+                registry,
+                testCardPaymentMethod);
+    }
+
+    @Bean
+    public SettlePaymentFromProviderUseCase settlePaymentFromProviderUseCase(
+            PaymentRepository payments,
+            WebhookEventRepository webhookEvents,
+            DomainEventPublisher eventPublisher,
+            UnitOfWork unitOfWork,
+            Clock clock,
+            @Value("${ticketflow.gateway.name}") String gatewayName) {
+
+        return new SettlePaymentFromProvider(payments, webhookEvents, eventPublisher,
+                unitOfWork, clock, gatewayName);
     }
 
     @Bean

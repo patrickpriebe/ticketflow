@@ -35,6 +35,12 @@ public interface ProcessOrderPaymentUseCase {
         /** A payment for this order already reached a final answer. */
         ALREADY_SETTLED,
         /**
+         * The provider took the charge and will answer by webhook. Nothing was
+         * published: announcing an outcome that does not exist yet is how a ticket
+         * gets issued for a boleto nobody paid.
+         */
+        AWAITING_PROVIDER,
+        /**
          * The gateway gave no usable answer and this method must not be retried
          * automatically. Left FAILED for an operator; the order expires on its own.
          */
