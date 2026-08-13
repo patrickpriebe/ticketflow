@@ -54,6 +54,20 @@ jobs:
             services/${{ matrix.service }}/target/failsafe-reports/
           retention-days: 7
 
+  secrets:
+    name: segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # O histórico inteiro: uma chave commitada e "removida" no commit
+          # seguinte continua no repositório, e é justamente essa que precisa ser
+          # rotacionada. Olhar só a árvore atual daria um verde enganoso.
+          fetch-depth: 0
+
+      - name: Varredura de credenciais no historico
+        run: bash .github/scripts/scan-secrets.sh
+
   contracts:
     name: contratos
     runs-on: ubuntu-latest

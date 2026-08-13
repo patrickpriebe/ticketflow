@@ -1,0 +1,74 @@
+#!/bin/sh
+# =============================================================================
+# Barreira contra segredo indo para o repositório.
+#
+# Instalar uma vez:  git config core.hooksPath .githooks
+#
+# Existe porque `.gitignore` protege contra o descuido comum — `git add .` com o
+# `.env` na pasta — e contra nenhum outro. Colar uma chave dentro de um yml, de
+# um teste ou de um README passa direto por ele. Este hook olha o CONTEÚDO do
+# que está sendo commitado, que é onde o problema realmente mora.
+#
+# Falso positivo acontece; nesse caso, `git commit --no-verify`. Só que aí a
+# decisão é consciente, que é o ponto.
+# =============================================================================
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# Lido por linha, com IFS vazio: padrão com espaço (o cabeçalho de chave privada
+# tem) seria quebrado em pedaços por um `for`, e cada pedaço viraria um regex
+# inválido. E `grep -e` porque um padrão que começa com `-` seria confundido com
+# opção de linha de comando.
+matched_kind=''
+check_file() {
+    file="$1"
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        kind=${line%%|*}
+        pattern=${line#*|}
+        if git show ":$file" 2>/dev/null | grep -Eq -e "$pattern"; then
+            matched_kind="$kind"
+            return 0
+        fi
+    done <<'PATTERNS'
+chave secreta Stripe|sk_(live|test)_[0-9a-zA-Z]{20}
+chave restrita Stripe|rk_(live|test)_[0-9a-zA-Z]{20}
+segredo de webhook Stripe|whsec_[0-9a-zA-Z]{20}
+token do GitHub|(ghp_|github_pat_)[0-9a-zA-Z_]{20}
+chave de acesso AWS|AKIA[0-9A-Z]{16}
+URI do MongoDB com senha|mongodb\+srv://[^<$"'[:space:]]+:[^@$"'[:space:]]+@
+URL do Postgres com senha|postgres(ql)?://[^<$"'[:space:]]+:[^@$"'[:space:]]+@
+chave privada|BEGIN [A-Z ]*PRIVATE KEY
+token do Slack|xox[baprs]-[0-9a-zA-Z]{10}
+PATTERNS
+    return 1
+}
+
+found=0
+for file in $staged; do
+    # O arquivo de exemplo existe justamente para mostrar o formato esperado, e
+    # este hook precisa conter os padrões para funcionar. Nenhum dos dois é vazamento.
+    case "$file" in
+        .env.example|*/.env.example|.githooks/pre-commit) continue ;;
+    esac
+
+    if check_file "$file"; then
+        echo "BLOQUEADO: '$file' contém o que parece ser uma $matched_kind"
+        found=1
+    fi
+done
+
+if [ "$found" -ne 0 ]; then
+    cat <<'EOF'
+
+Commit interrompido. Segredo em repositório não se resolve apagando depois: uma
+vez enviado, ele fica no histórico e precisa ser ROTACIONADO no provedor.
+
+Tire o valor do arquivo, aponte para uma variável de ambiente, e commite de novo.
+Se for falso positivo: git commit --no-verify
+EOF
+    exit 1
+fi
+
+exit 0
