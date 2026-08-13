@@ -93,12 +93,23 @@ springdoc:
 
 ticketflow:
   auth:
-    # Segredo de DESENVOLVIMENTO. Em qualquer ambiente real isto vira
-    # spring.security.oauth2.resourceserver.jwt.issuer-uri apontando para o
-    # provedor de identidade, e este valor deixa de existir.
-    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
-    # Endpoint que emite token sem verificar nada. Só para o front local e curl.
-    dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+    # SEM VALOR PADRÃO, de propósito: variável ausente derruba o boot.
+    #
+    # Havia um padrão aqui, e ele estava publicado no repositório — o que torna
+    # trivial forjar um token assinado corretamente para qualquer cliente. Um
+    # ambiente que suba com a chave de exemplo parece seguro e não é, e esse é o
+    # pior estado possível. Falhar alto é melhor.
+    #
+    # Os perfis `local` e `docker` mais abaixo definem um valor de brincadeira,
+    # porque lá não há nada a proteger.
+    secret: ${TICKETFLOW_AUTH_SECRET}
+    # Emite token sem verificar nada — qualquer pessoa, qualquer e-mail, sem senha.
+    #
+    # Desligado por padrão. Já foi `true` aqui, e significava que subir para
+    # qualquer lugar sem lembrar da variável deixava um emissor de identidade
+    # aberto na internet. O padrão de uma flag perigosa tem que ser o seguro:
+    # esquecer passa a ser inofensivo em vez de catastrófico.
+    dev-tokens: ${TICKETFLOW_DEV_TOKENS:false}
 
   order:
     # How long an order may sit in PENDING before the expiry sweep releases it.
@@ -134,6 +145,14 @@ spring:
     # default locations so it can never reach a real environment.
     locations: classpath:db/migration,classpath:db/seed
 
+ticketflow:
+  auth:
+    # Chave de brincadeira e emissor aberto: na máquina de quem desenvolve não há
+    # nada a proteger, e exigir um provedor de identidade de pé para rodar o
+    # projeto seria atrito puro. Fora daqui os dois voltam a ser obrigatórios.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+    dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+
 ---
 # Kubernetes. Everything comes from the ConfigMap and Secret - no defaults here on
 # purpose: a missing variable must fail loudly at boot, not silently connect to
@@ -166,3 +185,9 @@ spring:
     bootstrap-servers: kafka:19092
   flyway:
     locations: classpath:db/migration,classpath:db/seed
+
+ticketflow:
+  auth:
+    # Mesma escolha do perfil `local`: o compose é ambiente de demonstração.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+    dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}

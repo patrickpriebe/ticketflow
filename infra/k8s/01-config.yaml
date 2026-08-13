@@ -32,3 +32,11 @@ stringData:
   POSTGRES_PASSWORD: ticketflow
   MONGO_USER: ticketflow
   MONGO_PASSWORD: ticketflow
+  # Precisa existir: fora dos perfis `local` e `docker` esta variável não tem
+  # valor padrão, e o serviço se recusa a subir sem ela. É deliberado — havia um
+  # padrão publicado no repositório, e um ambiente que suba com a chave de
+  # exemplo aceita token forjado por qualquer pessoa.
+  #
+  # O emissor de token de desenvolvimento fica desligado aqui: nenhum
+  # TICKETFLOW_DEV_TOKENS é definido, e o padrão agora é `false`.
+  TICKETFLOW_AUTH_SECRET: minikube-troque-isto-fora-do-minikube-32

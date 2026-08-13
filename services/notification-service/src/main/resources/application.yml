@@ -58,7 +58,12 @@ ticketflow:
   auth:
     # Mesmo segredo que o Order Service valida: os dois são resource servers do
     # mesmo provedor. Em produção vira issuer-uri apontando para o provedor real.
-    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+    #
+    # SEM VALOR PADRÃO, pela mesma razão do Order Service: o padrão que havia aqui
+    # está publicado no repositório, e um ambiente que suba com ele aceita token
+    # forjado por qualquer pessoa. O perfil `docker` define um valor de
+    # brincadeira; fora dele, variável ausente derruba o boot.
+    secret: ${TICKETFLOW_AUTH_SECRET}
 
   archive:
     # Desligado por padrão: o serviço tem que rodar sem AWS nenhuma, e ninguém
@@ -111,6 +116,9 @@ spring:
     bootstrap-servers: kafka:19092
 
 ticketflow:
+  auth:
+    # O compose é ambiente de demonstração: chave de brincadeira serve.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
   archive:
     # No compose o LocalStack faz o papel da AWS.
     enabled: ${TICKETFLOW_ARCHIVE_ENABLED:false}

@@ -33,7 +33,12 @@ import static org.awaitility.Awaitility.await;
  * a silent consumer looks identical to a broken one from the outside. In here a
  * failure is a stack trace in seconds.
  */
-@SpringBootTest(properties = "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}")
+@SpringBootTest(properties = {
+        "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+        // Sem padrão na configuração base de propósito: um ambiente que suba com a
+        // chave de exemplo aceita token forjado. Quem precisa de uma, declara.
+        "ticketflow.auth.secret=segredo-de-teste-com-mais-de-32-caracteres"
+})
 @EmbeddedKafka(partitions = 1, topics = {
         NotificationFlowIT.ORDERS_CREATED,
         NotificationFlowIT.ORDERS_DLQ,

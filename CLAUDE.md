@@ -87,6 +87,10 @@ publicação fora do outbox.
   Rodar os testes de integração assim:
   `.\mvnw.cmd verify "-Dticketflow.it.datasource.url=jdbc:postgresql://localhost:5433/ticketflow_orders_it"`.
   Esse banco é apagado a cada teste — nunca apontar para `ticketflow_orders`.
+  No Notification Service o equivalente é o Mongo, e a credencial **precisa ser a
+  root**: o usuário `ticketflow` só tem permissão no banco de demonstração, e
+  apontar para o `_it` com ele falha com `not authorized`, não com erro de conexão.
+  `.\mvnw.cmd verify "-Dticketflow.it.mongo.uri=mongodb://root:root@localhost:27017/ticketflow_notifications_it?authSource=admin"`
 - Migrations rodam via container Flyway no compose e também no boot da aplicação.
   Os arquivos vivem em `src/main/resources/db/migration` de cada serviço.
 
@@ -120,6 +124,21 @@ Os outros dois serviços devem copiar estas escolhas, não reinventá-las:
   `EmptyResultDataAccessException` quando não há linha, e o Awaitility só repete em
   `AssertionError` — a espera aborta na primeira tentativa e o sintoma engana, parece
   que o consumidor nunca rodou. Usar `queryForList` e devolver null.
+- **Flag perigosa tem padrão seguro, e segredo não tem padrão nenhum.**
+  `ticketflow.auth.dev-tokens` já valeu `true` na configuração base — subir para
+  qualquer lugar sem lembrar da variável deixava um emissor de identidade aberto na
+  internet, emitindo token para qualquer e-mail sem senha. Hoje o padrão é `false`
+  e os perfis `local` e `docker` ligam explicitamente. `ticketflow.auth.secret` não
+  tem padrão fora desses dois perfis: variável ausente derruba o boot, porque um
+  ambiente rodando com a chave de exemplo publicada aqui aceita token forjado.
+- **A identidade do cliente é derivada do token, não é o `sub` cru.** O domínio usa
+  UUID; provedor de identidade não é obrigado a usar — o Google devolve um número.
+  `AuthenticatedCustomer.customerId` e o `CustomerIdentity` do Notification Service
+  aplicam a **mesma** regra (`sub` que já é UUID passa direto; senão deriva de
+  `issuer|sub`). Divergir entre os dois faz o Order gravar com um id e o
+  Notification buscar com outro: o ingresso some da tela sem erro em lugar nenhum.
+  Os dois lados têm um teste com o mesmo vetor fixo justamente para isso quebrar o
+  build.
 - **Recusa (`REJECTED`) e falha (`FAILED`) são coisas diferentes** e o Payment
   Service depende disso: recusa publica `PAGAMENTO_RECUSADO`; timeout ou 5xx não
   publicam nada, não gravam no inbox e deixam a mensagem ser reentregue. Nunca

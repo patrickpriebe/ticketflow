@@ -2,6 +2,7 @@ package com.ticketflow.notification.infrastructure.web;
 
 import com.ticketflow.notification.application.usecase.FindMyTickets;
 import com.ticketflow.notification.domain.model.Ticket;
+import com.ticketflow.notification.infrastructure.security.CustomerIdentity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,7 +39,10 @@ public class TicketController {
     @GetMapping
     public TicketsResponse myTickets(@AuthenticationPrincipal Jwt jwt,
                                      @RequestParam(required = false) String orderId) {
-        String requester = jwt.getSubject();
+        // Não é `jwt.getSubject()` direto: o id do cliente é derivado do token pela
+        // mesma regra do Order Service. Ler o `sub` cru aqui faria a busca usar uma
+        // chave diferente da que gravou o ingresso.
+        String requester = CustomerIdentity.of(jwt);
 
         List<Ticket> found = orderId == null || orderId.isBlank()
                 ? findMyTickets.ofCustomer(requester)
