@@ -18,12 +18,12 @@ spring:
       bindings:
         orderCreated-in-0:
           destination: ticketflow.orders.created
-          group: notification-service
+          group: notification-service${TICKETFLOW_GROUP_SUFFIX:}
           consumer:
             max-attempts: 3
         paymentProcessed-in-0:
           destination: ticketflow.payments.processed
-          group: notification-service
+          group: notification-service${TICKETFLOW_GROUP_SUFFIX:}
           consumer:
             # A payment result can arrive before its order snapshot has been stored.
             # The partition key guarantees ordering *within* a topic, not across two

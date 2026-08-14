@@ -104,7 +104,7 @@ public class StripePaymentGateway implements PaymentGateway {
             sample.stop(timer("error"));
             log.error("Stripe respondeu com erro para o pagamento {}: {}", request.paymentId(), e.getMessage());
             return AuthorizationResponse.errored(e.getMessage(),
-                    e.getStatusCode(), latency, e.getCode());
+                    e.getStatusCode(), latency, trace("erro", e.getCode()));
         }
     }
 
@@ -117,17 +117,38 @@ public class StripePaymentGateway implements PaymentGateway {
      */
     private AuthorizationResponse interpret(PaymentIntent intent, int latencyMs) {
         String status = intent.getStatus();
+        String raw = trace(status, intent.getId());
         return switch (status) {
-            case "succeeded" -> AuthorizationResponse.approved(intent.getId(), 200, latencyMs, status);
+            case "succeeded" -> AuthorizationResponse.approved(intent.getId(), 200, latencyMs, raw);
             case "canceled" -> AuthorizationResponse.rejected(
-                    "payment_intent_canceled", "O provedor cancelou a cobranca", 200, latencyMs, status);
+                    "payment_intent_canceled", "O provedor cancelou a cobranca", 200, latencyMs, raw);
             case "requires_payment_method", "requires_action", "requires_confirmation", "processing" ->
-                    AuthorizationResponse.accepted(intent.getId(), 200, latencyMs, status);
+                    AuthorizationResponse.accepted(intent.getId(), 200, latencyMs, raw);
             // Estado novo na API. Tratar como erro deixa a mensagem ser reentregue
             // em vez de decidir errado sobre dinheiro.
             default -> AuthorizationResponse.errored(
-                    "Estado desconhecido do PaymentIntent: " + status, 200, latencyMs, status);
+                    "Estado desconhecido do PaymentIntent: " + status, 200, latencyMs, raw);
         };
+    }
+
+    /**
+     * O rastro guardado na tentativa.
+     *
+     * <p>Precisa ser JSON válido: a coluna {@code payment_attempts.response_payload}
+     * é do tipo {@code json}, e o Postgres recusa uma string solta com "invalid
+     * input syntax for type json" — erro que aponta para o banco quando a causa
+     * está aqui.
+     *
+     * <p>Só estado e identificador. O PaymentIntent inteiro traria dados do
+     * pagador para dentro da nossa tabela sem necessidade nenhuma.
+     */
+    static String trace(String status, String intentId) {
+        return "{\"status\":\"" + escape(status) + "\",\"paymentIntent\":\"" + escape(intentId) + "\"}";
+    }
+
+    /** Valores vêm do provedor; escapar é barato e evita gerar JSON quebrado. */
+    private static String escape(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private PaymentIntentCreateParams buildParams(AuthorizationRequest request) {

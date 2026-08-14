@@ -1,0 +1,74 @@
+# =============================================================================
+# Mantém os serviços do Render acordados durante uma janela do dia.
+#
+# Por que isto existe
+# -------------------
+# O plano gratuito do Render hiberna um serviço após ~15 minutos sem requisição.
+# Para um site comum isso é invisível: a próxima visita acorda o processo e o
+# visitante só espera um pouco mais.
+#
+# Aqui não. O Payment e o Notification são consumidores de Kafka — ninguém faz
+# HTTP para eles. Dormindo, um pedido é aceito, o evento fica no tópico e o
+# pagamento nunca resolve. O site parece funcionar e o pedido fica PENDING para
+# sempre. As mensagens não se perdem; o que falta é alguém para consumi-las.
+#
+# A conta que define a janela
+# ---------------------------
+# São 750 horas de instância por mês para o workspace INTEIRO, e o TicketFlow tem
+# três serviços. Sete horas por dia dão 7 x 30 x 3 = 630 horas, deixando margem
+# para os outros projetos do mesmo workspace. Oito horas já encostariam em 720 e
+# um mês de 31 dias estouraria.
+#
+# Isto é um remendo, e vale dizer o nome: em instância paga o serviço não
+# hiberna e este arquivo não precisa existir.
+# =============================================================================
+
+name: manter acordado
+
+on:
+  schedule:
+    # A cada 10 minutos, das 12h às 18h59 UTC (9h-15h59 em Brasília).
+    # Dez minutos porque a hibernação começa aos quinze — um intervalo maior
+    # deixaria o serviço dormir entre um ping e outro.
+    - cron: '*/10 12-18 * * *'
+  # Para acordar tudo antes de uma demonstração fora da janela.
+  workflow_dispatch:
+
+# Duas execuções simultâneas não fazem sentido: a segunda acordaria o que a
+# primeira já acordou.
+concurrency:
+  group: keep-awake
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: acordar os servicos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar o health de cada servico
+        run: |
+          servicos="ticketflow-order ticketflow-payment ticketflow-notification"
+          falhas=0
+
+          for servico in $servicos; do
+            url="https://$servico.onrender.com/actuator/health"
+
+            # --max-time generoso de proposito: acordar de verdade leva perto de
+            # um minuto, e desistir antes disso deixaria o servico dormindo
+            # justamente quando o ping deveria te-lo acordado.
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$url" || echo "000")
+
+            if [ "$codigo" = "200" ]; then
+              echo "ok       $servico"
+            else
+              echo "::warning::$servico respondeu $codigo"
+              falhas=$((falhas + 1))
+            fi
+          done
+
+          # Sem falhar o job: um servico fora do ar por instante nao deve encher
+          # o repositorio de execucao vermelha. O aviso fica no log para quem
+          # for investigar.
+          if [ "$falhas" -gt 0 ]; then
+            echo "$falhas servico(s) nao responderam 200 nesta rodada"
+          fi

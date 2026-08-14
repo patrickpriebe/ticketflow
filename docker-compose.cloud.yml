@@ -26,6 +26,10 @@ services:
     container_name: ticketflow-order-service-cloud
     environment:
       SPRING_PROFILES_ACTIVE: cloud
+      # Marca este ambiente no grupo de consumidores. Sem isso a instancia
+      # local e a publicada entram no mesmo grupo e o Kafka divide as
+      # particoes entre as duas - metade dos pedidos some para o outro lado.
+      TICKETFLOW_GROUP_SUFFIX: ${TICKETFLOW_GROUP_SUFFIX:--local}
       POSTGRES_URL: ${POSTGRES_ORDERS_URL}
       POSTGRES_USER: ${POSTGRES_ORDERS_USER}
       POSTGRES_PASSWORD: ${POSTGRES_ORDERS_PASSWORD}
@@ -58,13 +62,27 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: cloud
+      # Marca este ambiente no grupo de consumidores. Sem isso a instancia
+      # local e a publicada entram no mesmo grupo e o Kafka divide as
+      # particoes entre as duas - metade dos pedidos some para o outro lado.
+      TICKETFLOW_GROUP_SUFFIX: ${TICKETFLOW_GROUP_SUFFIX:--local}
       POSTGRES_URL: ${POSTGRES_PAYMENTS_URL}
       POSTGRES_USER: ${POSTGRES_PAYMENTS_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PAYMENTS_PASSWORD}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
       KAFKA_USER: ${KAFKA_USER}
       KAFKA_PASSWORD: ${KAFKA_PASSWORD}
+      # `stripe` usa o provedor de verdade; `http` volta para o Wiremock, que
+      # continua de pé aqui e permite comparar os dois caminhos sem reconstruir.
+      TICKETFLOW_GATEWAY_PROVIDER: ${TICKETFLOW_GATEWAY_PROVIDER:-stripe}
       TICKETFLOW_GATEWAY_BASE_URL: http://payment-gateway:8080
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      # Do `stripe listen`, que encaminha os webhooks para esta máquina. É outro
+      # segredo do que o endpoint público usa — trocar os dois faz toda
+      # assinatura falhar.
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      # Cartão de teste que sempre aprova, para o ciclo fechar sem navegador.
+      STRIPE_TEST_CARD: ${STRIPE_TEST_CARD:-pm_card_visa}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
     ports:
       - "${PAYMENT_SERVICE_PORT:-8082}:8082"
@@ -76,6 +94,10 @@ services:
     container_name: ticketflow-notification-service-cloud
     environment:
       SPRING_PROFILES_ACTIVE: cloud
+      # Marca este ambiente no grupo de consumidores. Sem isso a instancia
+      # local e a publicada entram no mesmo grupo e o Kafka divide as
+      # particoes entre as duas - metade dos pedidos some para o outro lado.
+      TICKETFLOW_GROUP_SUFFIX: ${TICKETFLOW_GROUP_SUFFIX:--local}
       MONGO_URI: ${MONGO_URI}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
       KAFKA_USER: ${KAFKA_USER}

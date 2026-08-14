@@ -31,7 +31,18 @@ spring:
       bindings:
         orderCreated-in-0:
           destination: ticketflow.orders.created
-          group: payment-service
+          # O sufixo separa ambientes que compartilham o mesmo broker.
+          #
+          # Sem ele, a instância local e a publicada entram no MESMO grupo e o
+          # Kafka divide as partições entre as duas: metade dos pedidos vai para
+          # um ambiente, metade para o outro. Foi exatamente o que aconteceu — um
+          # pedido criado na máquina de desenvolvimento foi processado pelo
+          # serviço em produção, e o sintoma foi um pedido que nunca resolvia sem
+          # nenhum erro do lado de quem testava.
+          #
+          # Com broker separado por ambiente isto não seria necessário; com um
+          # cluster gratuito só, é o que mantém os dois sem se atrapalhar.
+          group: payment-service${TICKETFLOW_GROUP_SUFFIX:}
           consumer:
             max-attempts: 3
             back-off-initial-interval: 2000

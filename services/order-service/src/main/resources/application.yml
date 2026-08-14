@@ -40,7 +40,9 @@ spring:
         paymentProcessed-in-0:
           destination: ticketflow.payments.processed
           # The consumer group is also the inbox key in processed_events.
-          group: order-service
+          # Sufixo por ambiente: ver a nota no payment-service. Sem ele, a
+          # instancia local e a publicada dividem as particoes entre si.
+          group: order-service${TICKETFLOW_GROUP_SUFFIX:}
           consumer:
             max-attempts: 3
             back-off-initial-interval: 1000

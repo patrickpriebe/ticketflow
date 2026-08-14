@@ -39,6 +39,37 @@ class StripeAmountTest {
         assertThat(StripePaymentGateway.toMinorUnits("2400.00")).isEqualTo(240_000L);
     }
 
+    /**
+     * A coluna {@code payment_attempts.response_payload} e do tipo {@code json}.
+     * Gravar uma string solta ali derruba o INSERT com "invalid input syntax for
+     * type json" — e o erro aponta para o banco quando a causa esta no adaptador.
+     *
+     * <p>Foi exatamente assim que quebrou na primeira compra real: o pedido ficou
+     * PENDING para sempre, sem nada na tela indicando o motivo.
+     */
+    @Test
+    @DisplayName("o rastro gravado na tentativa e JSON valido")
+    void traceIsValidJson() {
+        String trace = StripePaymentGateway.trace("succeeded", "pi_3ABC123");
+
+        assertThat(trace).isEqualTo("{\"status\":\"succeeded\",\"paymentIntent\":\"pi_3ABC123\"}");
+    }
+
+    @Test
+    @DisplayName("aspas vindas do provedor nao quebram o JSON")
+    void traceEscapesQuotes() {
+        String trace = StripePaymentGateway.trace("esta\"ranho", "pi_1");
+
+        assertThat(trace).isEqualTo("{\"status\":\"esta\\\"ranho\",\"paymentIntent\":\"pi_1\"}");
+    }
+
+    @Test
+    @DisplayName("valor nulo nao vira a palavra null dentro do JSON")
+    void traceHandlesNull() {
+        assertThat(StripePaymentGateway.trace("erro", null))
+                .isEqualTo("{\"status\":\"erro\",\"paymentIntent\":\"\"}");
+    }
+
     @Test
     @DisplayName("fracao de centavo derruba em vez de arredondar em silencio")
     void refusesSubCentPrecision() {
