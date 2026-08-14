@@ -131,6 +131,15 @@ Os outros dois serviços devem copiar estas escolhas, não reinventá-las:
   e os perfis `local` e `docker` ligam explicitamente. `ticketflow.auth.secret` não
   tem padrão fora desses dois perfis: variável ausente derruba o boot, porque um
   ambiente rodando com a chave de exemplo publicada aqui aceita token forjado.
+- **Com provedor externo, `audience` é obrigatório junto com `issuer-uri`.**
+  Assinatura válida e emissor correto provam que o Google emitiu o token — não que
+  ele foi emitido para nós. Um token legítimo de qualquer outro aplicativo do Google
+  traz o mesmo `iss` e o mesmo `sub` da pessoa, e sem comparar o `aud` ele entra
+  como login válido. Os dois serviços derrubam o boot se vier issuer sem audience,
+  e `JwtDecoderSelectionTest` trava isso nos dois lados. No Render, uma variável
+  `sync: false` **não é criada** numa sincronização automática do blueprint: ela
+  nasce ausente e o deploy falha até alguém preencher no painel — é o
+  comportamento desejado, mas conte com um deploy vermelho ao adicionar uma.
 - **A identidade do cliente é derivada do token, não é o `sub` cru.** O domínio usa
   UUID; provedor de identidade não é obrigado a usar — o Google devolve um número.
   `AuthenticatedCustomer.customerId` e o `CustomerIdentity` do Notification Service

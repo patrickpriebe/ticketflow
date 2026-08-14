@@ -31,10 +31,11 @@ outras URLs e outras credenciais no perfil `cloud`.
 
 Duas ressalvas honestas sobre o ambiente publicado:
 
-- **Entrar ainda não funciona.** O emissor de token de desenvolvimento assina para
-  qualquer e-mail sem verificar senha, e está desligado fora do ambiente local de
-  propósito. O login com Google entra em seguida; até lá dá para navegar o catálogo
-  e a página do evento, e o checkout para na tela de entrar.
+- **Entrar é com Google.** O emissor de token de desenvolvimento assina para
+  qualquer e-mail sem verificar senha e está desligado fora do ambiente local, de
+  propósito. Lá quem emite identidade é o Google, e os dois serviços só validam:
+  assinatura contra o JWKS dele, emissor, validade e `aud` igual ao nosso client
+  id. A sessão dura uma hora — é o tempo de vida do ID token, e não há refresh.
 - **O primeiro acesso pode demorar.** No plano gratuito do Render a instância
   hiberna, e acordar uma JVM leva perto de um minuto. Um agendamento mantém os
   serviços de pé durante o dia sem estourar as 750 horas mensais.

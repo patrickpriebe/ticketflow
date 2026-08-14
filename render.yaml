@@ -7,6 +7,18 @@
 # faz o Render pedi-la no momento de aplicar o blueprint e guardá-la no painel.
 # Este arquivo vai para o GitHub; os valores não.
 #
+# Um detalhe do `sync: false` que só se aprende quebrando: numa sincronização
+# AUTOMÁTICA — a que roda sozinha quando o commit muda este arquivo — o Render
+# não tem como pedir o valor a ninguém, então simplesmente **não cria a
+# variável**. Ela nasce ausente, e o serviço sobe sem ela.
+#
+# Foi o que aconteceu quando o TICKETFLOW_AUTH_AUDIENCE entrou aqui: o issuer
+# tinha valor literal e foi aplicado, o audience ficou vazio, e o Order e o
+# Notification se recusaram a subir. O deploy falhou, que é exatamente o
+# desejado — a alternativa seria um serviço no ar aceitando token emitido para
+# qualquer outro aplicativo do Google. Ao adicionar uma variável `sync: false`,
+# conte com um deploy vermelho até preenchê-la no painel.
+#
 # -----------------------------------------------------------------------------
 # O limite que moldou este arquivo
 #
