@@ -652,9 +652,102 @@
 
 /* --- Entrar --------------------------------------------------------------- */
 
+/* Duas colunas, e a da esquerda não é enfeite: uma tela de entrar solta no meio
+   do vazio não diz o que acontece depois de entrar, e é essa a pergunta de quem
+   parou aqui no meio de uma compra. A arte é a mesma do hero, gerada do mesmo
+   jeito — o site continua parecendo o mesmo site. */
+.auth-split {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  min-height: min(660px, 76vh);
+}
+
+.auth-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--space-8) var(--space-6);
+  overflow: hidden;
+  background: var(--surface-inverted);
+}
+
+.auth-brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #000 30%, transparent) 0%,
+    color-mix(in srgb, #000 78%, transparent) 100%
+  );
+}
+
+.auth-brand-body {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin-left: auto;
+  padding-right: var(--space-6);
+}
+
+.auth-brand h1 {
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.auth-brand p {
+  margin-top: var(--space-3);
+  color: rgb(255 255 255 / 76%);
+}
+
+.auth-points {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-7);
+  list-style: none;
+}
+
+.auth-points li {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.auth-point-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: rgb(255 255 255 / 14%);
+  border: 1px solid rgb(255 255 255 / 18%);
+}
+
+.auth-points strong {
+  display: block;
+  color: #fff;
+  font-size: var(--text-sm);
+}
+
+.auth-points span {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 66%);
+}
+
+.auth-panel {
+  display: grid;
+  place-items: center;
+  padding: var(--space-8) var(--space-5);
+}
+
 .auth-card {
-  max-width: 420px;
-  margin: var(--space-8) auto;
+  width: 100%;
+  max-width: 400px;
   padding: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -662,11 +755,51 @@
   box-shadow: var(--shadow-md);
 }
 
+.auth-card h2 {
+  margin-top: var(--space-4);
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.auth-card > .muted {
+  margin-top: var(--space-2);
+}
+
 .auth-card form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   margin-top: var(--space-5);
+}
+
+/* Alinhado à esquerda como todo o resto do cartão. Centralizado — que é o
+   padrão de `.fine-print` — ele ficava com a borda direita serrilhada no meio
+   de um bloco justificado à esquerda. */
+.auth-card .fine-print {
+  margin-top: var(--space-5);
+  text-align: left;
+}
+
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  width: 100%;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.auth-back:hover {
+  color: var(--text);
+}
+
+/* A seta aponta para a direita no resto do site; aqui o caminho é de volta. */
+.auth-back svg {
+  transform: rotate(180deg);
 }
 
 /* O botão do Google é um iframe montado pelo script deles: a aparência interna
@@ -698,11 +831,40 @@
   .trending {
     grid-template-columns: 1fr;
   }
+
+  /* Empilhado, o painel escuro vira uma faixa de apresentação e o cartão vem
+     logo abaixo. A altura mínima sai do caminho: numa tela baixa ela deixaria
+     o botão de entrar fora da primeira dobra. */
+  .auth-split {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .auth-brand-body {
+    margin-inline: auto;
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 720px) {
   .header-search {
     display: none;
+  }
+
+  /* Os três pontos saem no celular: quem chegou aqui no meio de uma compra
+     precisa do botão, não do texto. A promessa continua no cartão. */
+  .auth-points {
+    display: none;
+  }
+
+  .auth-brand {
+    padding: var(--space-7) var(--space-5);
+  }
+
+  /* Empilhado, a folga generosa de desktop vira um buraco entre a faixa e o
+     cartão — e o botão de entrar cai abaixo da dobra por causa dele. */
+  .auth-panel {
+    padding: var(--space-6) var(--space-4);
   }
 
   .header-inner {

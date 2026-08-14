@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { googleClientId } from '../api';
 import { Icon } from '../components/Icon';
+import { Poster } from '../components/Poster';
 import { loadGoogleIdentity } from '../lib/google';
+import { linkProps } from '../lib/router';
 
 interface Props {
   /** Emissor de desenvolvimento — só existe onde não há provedor configurado. */
@@ -16,22 +18,95 @@ const INTRO =
   'O catálogo é público, mas comprar exige identidade — a API tira quem você é do token, nunca do que o navegador manda no corpo da requisição.';
 
 export function SignIn({ onSignIn, onGoogleCredential, reason }: Props) {
-  return googleClientId
-    ? <GoogleSignIn onCredential={onGoogleCredential} reason={reason} />
-    : <DevSignIn onSignIn={onSignIn} reason={reason} />;
+  return (
+    <section className="auth-split">
+      <Brand reason={reason} />
+
+      <div className="auth-panel">
+        {googleClientId
+          ? <GoogleSignIn onCredential={onGoogleCredential} />
+          : <DevSignIn onSignIn={onSignIn} />}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * O lado que explica
+ *
+ * Uma tela de entrar costuma ser um retângulo no meio do vazio. Aqui ela
+ * carrega o mesmo peso visual do resto do site — a arte é a mesma do hero,
+ * gerada do mesmo jeito — e responde à pergunta que a pessoa realmente tem
+ * neste momento: o que acontece depois que eu entrar.
+ * ------------------------------------------------------------------ */
+
+function Brand({ reason }: { reason?: string }) {
+  return (
+    <aside className="auth-brand">
+      {/* O MESMO seed do hero da home, e não um só desta tela.
+          A paleta sai de um hash do seed, então um seed próprio daqui cairia
+          numa cor por sorteio — o primeiro que tentei deu verde, brigando com o
+          azul da marca. Repetir o seed do hero é explícito: entrar veste a arte
+          da home, e nenhuma mudança futura na lista de paletas transforma esta
+          tela em outra coisa sem querer. */}
+      <div className="hero-art">
+        <Poster seed="ticketflow-hero" />
+      </div>
+
+      <div className="auth-brand-body">
+        <h1>Entre para garantir seu ingresso</h1>
+        <p>{reason ?? INTRO}</p>
+
+        <ul className="auth-points">
+          <li>
+            <span className="auth-point-icon" aria-hidden="true">
+              <Icon name="bolt" size={17} />
+            </span>
+            <div>
+              <strong>O pedido é aceito na hora</strong>
+              <span>
+                O pagamento resolve em segundo plano e você acompanha o status —
+                sem tela de espera enquanto a operadora responde.
+              </span>
+            </div>
+          </li>
+
+          <li>
+            <span className="auth-point-icon" aria-hidden="true">
+              <Icon name="shield" size={17} />
+            </span>
+            <div>
+              <strong>Sua senha não passa por aqui</strong>
+              <span>
+                Quem autentica é o Google. O TicketFlow só confere a assinatura do
+                token que ele devolve.
+              </span>
+            </div>
+          </li>
+
+          <li>
+            <span className="auth-point-icon" aria-hidden="true">
+              <Icon name="ticket" size={17} />
+            </span>
+            <div>
+              <strong>O ingresso aparece em Meus pedidos</strong>
+              <span>
+                Assim que o pagamento é aprovado, com QR Code e tudo o que você
+                precisa na porta.
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </aside>
+  );
 }
 
 /* ------------------------------------------------------------------ *
  * Provedor de verdade
  * ------------------------------------------------------------------ */
 
-function GoogleSignIn({
-  onCredential,
-  reason,
-}: {
-  onCredential: (idToken: string) => Promise<void>;
-  reason?: string;
-}) {
+function GoogleSignIn({ onCredential }: { onCredential: (idToken: string) => Promise<void> }) {
   const slot = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,22 +158,13 @@ function GoogleSignIn({
   }, []);
 
   return (
-    <Card reason={reason}>
+    <Card
+      title="Entrar"
+      subtitle="Use sua conta Google. É o único jeito de entrar por aqui."
+      footnote="A sessão dura uma hora — é o tempo de vida do token que o Google emite. Depois disso é só entrar de novo."
+    >
       <div className="google-slot" ref={slot} />
-
-      {error && (
-        <p className="alert" style={{ marginTop: 'var(--space-4)' }}>
-          <Icon name="close" size={18} />
-          {error}
-        </p>
-      )}
-
-      <p className="fine-print" style={{ marginTop: 'var(--space-4)' }}>
-        O TicketFlow não recebe nem guarda sua senha. O Google devolve um token
-        assinado, e os serviços conferem a assinatura, o emissor e se ele foi
-        emitido para esta aplicação — só isso vale como identidade. A sessão dura
-        uma hora.
-      </p>
+      {error && <Alert>{error}</Alert>}
     </Card>
   );
 }
@@ -107,13 +173,7 @@ function GoogleSignIn({
  * Ambiente local
  * ------------------------------------------------------------------ */
 
-function DevSignIn({
-  onSignIn,
-  reason,
-}: {
-  onSignIn: (name: string, email: string) => Promise<void>;
-  reason?: string;
-}) {
+function DevSignIn({ onSignIn }: { onSignIn: (name: string, email: string) => Promise<void> }) {
   const [name, setName] = useState('Ana Souza');
   const [email, setEmail] = useState('ana.souza@example.com');
   const [busy, setBusy] = useState(false);
@@ -133,7 +193,11 @@ function DevSignIn({
   };
 
   return (
-    <Card reason={reason}>
+    <Card
+      title="Entrar"
+      subtitle="Ambiente local: o token é emitido sem senha, e qualquer nome serve."
+      footnote="Este emissor está desligado em qualquer ambiente publicado. Onde há provedor configurado, esta mesma tela mostra o botão do Google — e nada mais no front muda."
+    >
       <form onSubmit={submit}>
         <div className="field">
           <label htmlFor="signin-name">Nome</label>
@@ -164,38 +228,52 @@ function DevSignIn({
         </button>
       </form>
 
-      {error && (
-        <p className="alert" style={{ marginTop: 'var(--space-4)' }}>
-          <Icon name="close" size={18} />
-          {error}
-        </p>
-      )}
-
-      <p className="fine-print" style={{ marginTop: 'var(--space-4)' }}>
-        Ambiente local: o token é emitido sem senha por um endpoint de
-        desenvolvimento, desligado em qualquer ambiente publicado. Onde há
-        provedor configurado, esta mesma tela mostra o botão do Google — e nada
-        mais no front muda.
-      </p>
+      {error && <Alert>{error}</Alert>}
     </Card>
   );
 }
 
-function Card({ reason, children }: { reason?: string; children: React.ReactNode }) {
+/* ------------------------------------------------------------------ *
+ * Moldura
+ * ------------------------------------------------------------------ */
+
+function Card({
+  title,
+  subtitle,
+  footnote,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  footnote: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="shell">
-      <div className="auth-card">
-        <span className="brand-mark" aria-hidden="true">
-          <Icon name="user" size={17} />
-        </span>
+    <div className="auth-card">
+      <span className="brand-mark" aria-hidden="true">
+        <Icon name="user" size={17} />
+      </span>
 
-        <h1 style={{ marginTop: 'var(--space-4)' }}>Entrar para comprar</h1>
-        <p className="muted small" style={{ marginTop: 'var(--space-2)' }}>
-          {reason ?? INTRO}
-        </p>
+      <h2>{title}</h2>
+      <p className="muted small">{subtitle}</p>
 
-        {children}
-      </div>
-    </section>
+      {children}
+
+      <p className="fine-print">{footnote}</p>
+
+      <a className="auth-back" {...linkProps('/events')}>
+        <Icon name="chevron" size={15} />
+        Voltar para o catálogo
+      </a>
+    </div>
+  );
+}
+
+function Alert({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="alert" style={{ marginTop: 'var(--space-4)' }}>
+      <Icon name="close" size={18} />
+      {children}
+    </p>
   );
 }
