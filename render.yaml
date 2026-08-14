@@ -111,6 +111,17 @@ services:
       # é coisa de ambiente de teste local.
       - key: STRIPE_TEST_CARD
         value: ""
+      # Identidade. Entrou quando o navegador passou a consultar a cobrança aqui
+      # para confirmar o cartão — antes disso este serviço só falava com o Kafka
+      # e com o provedor, e não tinha camada de segurança nenhuma.
+      #
+      # Sem as duas, o boot cai. É o mesmo comportamento dos outros dois
+      # serviços, e é o desejado: um endpoint que devolve credencial de cobrança
+      # não pode subir sem saber verificar quem está pedindo.
+      - key: TICKETFLOW_AUTH_ISSUER_URI
+        value: https://accounts.google.com
+      - key: TICKETFLOW_AUTH_AUDIENCE
+        sync: false
       # Neon
       - key: POSTGRES_URL
         sync: false

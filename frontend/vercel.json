@@ -13,6 +13,10 @@
       "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets"
     },
     {
+      "source": "/api/v1/payments/:path*",
+      "destination": "https://ticketflow-payment.onrender.com/api/v1/payments/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://ticketflow-order.onrender.com/api/:path*"
     },

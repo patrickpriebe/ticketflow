@@ -193,6 +193,41 @@ export function signOut() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+/* ------------------------------------------------------------------ *
+ * Cobrança
+ *
+ * Esta é a única chamada que vai para o Payment Service. Ela existe porque o
+ * `client_secret` — o que autoriza confirmar o cartão — nasce lá, e levá-lo até
+ * o Order Service exigiria uma chamada HTTP entre serviços, proibida neste
+ * projeto, ou mandar a credencial dentro de um evento Kafka.
+ *
+ * O navegador fala com os três serviços; os três continuam sem se falar.
+ * ------------------------------------------------------------------ */
+
+export interface OrderPayment {
+  orderId: string;
+  method: PaymentMethod;
+  status: string;
+  /** Ausente quando não há o que confirmar — inclusive antes de a cobrança existir. */
+  clientSecret?: string;
+}
+
+/**
+ * Devolve `null` para 404.
+ *
+ * <p>404 aqui é esperado e não é erro: quem cria a cobrança é um consumidor de
+ * Kafka, então há uma janela entre o pedido ser aceito e a cobrança existir. A
+ * tela trata como "ainda não" e pergunta de novo.
+ */
+export async function getOrderPayment(orderId: string): Promise<OrderPayment | null> {
+  try {
+    return await request<OrderPayment>(`/api/v1/payments/by-order/${orderId}`);
+  } catch (e) {
+    if (e instanceof ProblemError && e.status === 404) return null;
+    throw e;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const active = currentSession();
   const response = await fetch(path, {

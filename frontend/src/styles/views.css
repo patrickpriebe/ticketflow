@@ -650,6 +650,34 @@
   gap: 2px;
 }
 
+/* --- Pagamento com cartão -------------------------------------------------- */
+
+.card-payment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.card-payment h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 1.0625rem;
+}
+
+/* O campo do cartão é um iframe do Stripe: a aparência interna não é nossa para
+   estilizar. O que cabe aqui é reservar altura, para a página não pular quando
+   ele termina de carregar. */
+.card-slot {
+  min-height: 42px;
+}
+
+.card-payment .fine-print {
+  text-align: left;
+}
+
 /* --- Entrar --------------------------------------------------------------- */
 
 /* Duas colunas, e a da esquerda não é enfeite: uma tela de entrar solta no meio

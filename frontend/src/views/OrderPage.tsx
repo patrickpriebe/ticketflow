@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listTickets, type Order, type OrderStatus, type Ticket } from '../api';
+import { CardPayment } from '../components/CardPayment';
 import { Countdown } from '../components/Countdown';
 import { Icon } from '../components/Icon';
 import { Stepper } from '../components/Stepper';
@@ -148,6 +149,12 @@ export function OrderPage({ order, error }: Props) {
             </div>
           )}
         </div>
+
+        {/* Cartão é o único método que precisa de uma ação aqui: PIX e boleto
+            se resolvem fora do site, e a resposta chega por webhook. */}
+        {order.status === 'PENDING' && order.paymentMethod === 'CREDIT_CARD' && (
+          <CardPayment orderId={order.id} />
+        )}
 
         <div className="perforation" aria-hidden="true">
           <span className="notch left" />
