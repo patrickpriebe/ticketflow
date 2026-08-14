@@ -1,7 +1,15 @@
 import type { EventDetail } from '../api';
 import { Icon } from '../components/Icon';
 import { Poster } from '../components/Poster';
-import { cartCount, cartTotal, quantityOf, setQuantity, type Cart } from '../lib/cart';
+import {
+  canAddCategory,
+  cartCount,
+  cartTotal,
+  MAX_CATEGORIES,
+  quantityOf,
+  setQuantity,
+  type Cart,
+} from '../lib/cart';
 import { longDate, money, time } from '../lib/format';
 import { navigate } from '../lib/router';
 
@@ -122,6 +130,9 @@ export function EventPage({ event, cart, onCart }: Props) {
               const quantity = quantityOf(cart, category.id);
               const soldOut = category.availableQuantity === 0;
               const max = Math.min(MAX_PER_CATEGORY, category.availableQuantity);
+              // O pedido aceita no máximo dez categorias. Barrar aqui evita
+              // escolher a décima primeira e só descobrir no envio.
+              const blockedByCartLimit = !canAddCategory(cart, category.id);
 
               const change = (next: number) =>
                 onCart(
@@ -175,7 +186,12 @@ export function EventPage({ event, cart, onCart }: Props) {
                         <strong aria-live="polite">{quantity}</strong>
                         <button
                           aria-label={`Adicionar um ${category.name}`}
-                          disabled={quantity >= max}
+                          disabled={quantity >= max || blockedByCartLimit}
+                          title={
+                            blockedByCartLimit
+                              ? `Um pedido leva no máximo ${MAX_CATEGORIES} tipos de ingresso.`
+                              : undefined
+                          }
                           onClick={() => change(quantity + 1)}
                         >
                           +

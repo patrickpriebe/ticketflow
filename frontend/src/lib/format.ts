@@ -13,10 +13,6 @@ export const time = (iso: string) =>
 export const longDate = (iso: string) =>
   new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso));
 
-/** "18 set" — para linhas apertadas de cartão. */
-export const shortDate = (iso: string) =>
-  new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(iso));
-
 /** Dia e mês curtos, para o selo de calendário sobre a arte do evento. */
 export function calendarBadge(iso: string) {
   const date = new Date(iso);

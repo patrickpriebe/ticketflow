@@ -35,9 +35,3 @@ export function applyPreference(preference: ThemePreference) {
   localStorage.setItem(STORAGE_KEY, preference);
   requestAnimationFrame(() => root.classList.remove('theme-switching'));
 }
-
-/** O que está de fato na tela agora, já resolvendo o `system`. */
-export function resolvedTheme(preference: ThemePreference): 'light' | 'dark' {
-  if (preference !== 'system') return preference;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}

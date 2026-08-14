@@ -15,8 +15,27 @@ import type { EventDetail, Money, OrderItemInput } from '../api';
 
 const STORAGE_KEY = 'ticketflow.cart';
 
-/** Teto do contrato: `items` aceita no máximo 10 categorias por pedido. */
+/**
+ * Teto do contrato: `items` aceita no máximo 10 categorias por pedido, e o
+ * Order Service valida com `@Size(max = 10)`.
+ *
+ * Esta constante existia sem ninguém usá-la — a regra estava escrita aqui e não
+ * era aplicada em lugar nenhum do front. O efeito seria escolher a décima
+ * primeira categoria, seguir o checkout inteiro e tomar um erro de validação no
+ * envio, depois de já ter escolhido o meio de pagamento.
+ */
 export const MAX_CATEGORIES = 10;
+
+/**
+ * Ainda cabe mexer nesta categoria?
+ *
+ * Categoria que já está no carrinho sempre pode: tirar ou trocar a quantidade
+ * não aumenta o número de linhas. O teto só barra a entrada de uma nova.
+ */
+export function canAddCategory(cart: Cart, categoryId: string): boolean {
+  if (cart.lines.some((line) => line.categoryId === categoryId)) return true;
+  return cart.lines.length < MAX_CATEGORIES;
+}
 
 export interface CartLine {
   categoryId: string;
@@ -48,6 +67,10 @@ export function emptyCart(event: EventDetail): Cart {
 }
 
 export function setQuantity(cart: Cart, line: Omit<CartLine, 'quantity'>, quantity: number): Cart {
+  // A tela já desabilita o botão no limite; esta guarda existe porque a regra é
+  // do carrinho, não do botão. Quem chamar por outro caminho topa no mesmo teto.
+  if (quantity > 0 && !canAddCategory(cart, line.categoryId)) return cart;
+
   const others = cart.lines.filter((existing) => existing.categoryId !== line.categoryId);
   const lines = quantity > 0 ? [...others, { ...line, quantity }] : others;
 

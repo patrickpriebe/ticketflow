@@ -33,6 +33,27 @@ Nenhuma dependência além de `react` e `react-dom`.
 /signin              Identificação
 ```
 
+### Entrar
+
+A tela tem duas colunas: um painel escuro com a arte do hero, que responde "o que
+acontece depois que eu entrar", e o cartão com o mecanismo de entrada.
+
+O mecanismo depende de haver provedor configurado, e é a única diferença entre os
+dois ambientes:
+
+- **`VITE_GOOGLE_CLIENT_ID` definido** — botão do Google. O provedor devolve um ID
+  token assinado direto para o navegador, que o manda no `Authorization`. Sem troca
+  de código, sem sessão e sem cookie: os serviços continuam sendo resource servers
+  puros. O token vale uma hora e não há refresh — passada a hora, a API responde
+  401, o front derruba a sessão e a pessoa entra de novo.
+- **Sem client id** — formulário de desenvolvimento, que fala com um emissor local
+  que não verifica nada. É o que permite rodar o projeto inteiro sem ter conta em
+  provedor nenhum. Esse emissor está desligado em qualquer ambiente publicado.
+
+O front lê os claims do token para escrever o nome na tela, **e só para isso**.
+Qualquer pessoa monta um JWT com o nome que quiser; a parte que não dá para forjar
+é a assinatura, e conferir assinatura é trabalho de quem guarda os dados.
+
 ## Design system
 
 Tudo sai de `src/styles/tokens.css`. **Nenhum componente escreve um
