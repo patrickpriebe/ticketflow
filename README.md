@@ -20,6 +20,27 @@ sustentar essa premissa.
 
 ---
 
+## No ar
+
+**https://ticketflow-sandy-mu.vercel.app**
+
+O front está na Vercel e os três serviços no Render, contra bancos gerenciados —
+Supabase para os pedidos, Neon para os pagamentos, MongoDB Atlas para os ingressos
+— e Redpanda no lugar do Kafka. Nada disso muda uma linha do código de domínio: são
+outras URLs e outras credenciais no perfil `cloud`.
+
+Duas ressalvas honestas sobre o ambiente publicado:
+
+- **Entrar ainda não funciona.** O emissor de token de desenvolvimento assina para
+  qualquer e-mail sem verificar senha, e está desligado fora do ambiente local de
+  propósito. O login com Google entra em seguida; até lá dá para navegar o catálogo
+  e a página do evento, e o checkout para na tela de entrar.
+- **O primeiro acesso pode demorar.** No plano gratuito do Render a instância
+  hiberna, e acordar uma JVM leva perto de um minuto. Um agendamento mantém os
+  serviços de pé durante o dia sem estourar as 750 horas mensais.
+
+---
+
 ## Como subir
 
 Só precisa de **Docker Desktop**. Na raiz do repositório:
