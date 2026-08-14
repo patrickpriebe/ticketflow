@@ -79,6 +79,19 @@ management:
       # Stamped on every metric, so one Grafana panel can break a number down by
       # service without needing three separate queries.
       application: ${spring.application.name}
+    distribution:
+      # Sem isto o Micrometer publica só contagem e soma, e todo
+      # `histogram_quantile` no Grafana devolve "No data" — foi exatamente o que
+      # aconteceu: dois painéis de latência ficaram vazios desde que nasceram.
+      #
+      # Painel que nunca tem dado é pior que painel nenhum: ensina a ignorar o
+      # dashboard, e aí o painel que importa também é ignorado.
+      percentiles-histogram:
+        http.server.requests: true
+      # Os cortes que interessam para esta API. O POST /orders não espera o
+      # pagamento, então centenas de milissegundos aqui já é sintoma.
+      slo:
+        http.server.requests: 50ms,100ms,250ms,500ms,1s,2s
   observations:
     key-values:
       application: ${spring.application.name}

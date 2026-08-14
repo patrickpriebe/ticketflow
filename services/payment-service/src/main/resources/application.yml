@@ -74,6 +74,17 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      # Sem isto o `histogram_quantile` do Grafana devolve "No data": o
+      # Micrometer publica só contagem e soma. O painel de latência do gateway
+      # ficou vazio desde que nasceu por causa disso.
+      percentiles-histogram:
+        http.server.requests: true
+        ticketflow.payment.gateway.calls: true
+      # O read-timeout do gateway é 5s. Os cortes cercam esse valor, que é onde
+      # a latência deixa de ser lentidão e vira TIMEOUT.
+      slo:
+        ticketflow.payment.gateway.calls: 250ms,500ms,1s,2s,5s
   observations:
     key-values:
       application: ${spring.application.name}

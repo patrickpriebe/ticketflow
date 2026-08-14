@@ -22,7 +22,7 @@ sustentar essa premissa.
 
 ## No ar
 
-**https://ticketflow-sandy-mu.vercel.app**
+**https://ticketflow-br.vercel.app**
 
 O front está na Vercel e os três serviços no Render, contra bancos gerenciados —
 Supabase para os pedidos, Neon para os pagamentos, MongoDB Atlas para os ingressos
