@@ -56,7 +56,18 @@ services:
         sync: false
       - key: KAFKA_PASSWORD
         sync: false
-      - key: TICKETFLOW_AUTH_SECRET
+      # Identidade: aqui quem emite é o Google e o serviço só valida.
+      #
+      # O segredo simétrico não sobe mais para cá — ele era a chave de um emissor
+      # que não existe neste ambiente. As duas linhas abaixo o substituem, e as
+      # duas são obrigatórias: sem `AUDIENCE`, um token do Google emitido para
+      # outro site entra como login válido, com o `sub` real da pessoa.
+      - key: TICKETFLOW_AUTH_ISSUER_URI
+        value: https://accounts.google.com
+      # O client id do OAuth. Não é segredo — viaja no HTML de qualquer site com
+      # "entrar com Google" — mas fica em `sync: false` junto com o resto para o
+      # painel ser a fonte única de configuração de ambiente.
+      - key: TICKETFLOW_AUTH_AUDIENCE
         sync: false
 
   # -------------------------------------------------------------- payment ----
@@ -126,7 +137,12 @@ services:
         sync: false
       - key: KAFKA_PASSWORD
         sync: false
-      - key: TICKETFLOW_AUTH_SECRET
+      # O mesmo emissor e o mesmo client id do Order Service, e precisa continuar
+      # sendo: os dois validam o token da mesma pessoa. Se divergirem, ela compra
+      # e não vê o ingresso — 401 numa tela e nada de errado na outra.
+      - key: TICKETFLOW_AUTH_ISSUER_URI
+        value: https://accounts.google.com
+      - key: TICKETFLOW_AUTH_AUDIENCE
         sync: false
       # Arquivamento de ingresso em S3 fica para depois; sem bucket, desligado.
       - key: TICKETFLOW_ARCHIVE_ENABLED

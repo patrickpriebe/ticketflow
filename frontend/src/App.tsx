@@ -6,6 +6,7 @@ import {
   placeOrder,
   ProblemError,
   signIn,
+  signInWithGoogle,
   signOut,
   type EventDetail,
   type EventSummary,
@@ -22,6 +23,7 @@ import {
   toOrderItems,
   type Cart,
 } from './lib/cart';
+import { forgetGoogleSession } from './lib/google';
 import { navigate, useRoute } from './lib/router';
 import { applyPreference, storedPreference } from './lib/theme';
 import { useOrderStatus } from './useOrderStatus';
@@ -92,12 +94,24 @@ export default function App() {
 
   const doSignIn = async (name: string, email: string) => {
     setSession(await signIn(name, email));
+    afterSignIn();
+  };
+
+  const doGoogleSignIn = async (idToken: string) => {
+    setSession(signInWithGoogle(idToken));
+    afterSignIn();
+  };
+
+  /** Os dois emissores terminam igual: de volta para onde a pessoa estava. */
+  function afterSignIn() {
     navigate(returnTo ?? '/', { replace: true });
     setReturnTo(null);
-  };
+  }
 
   const doSignOut = () => {
     signOut();
+    // Sem isto o Google reentra sozinho na próxima visita, e sair não sai.
+    forgetGoogleSession();
     setSession(null);
     navigate('/');
   };
@@ -178,12 +192,17 @@ export default function App() {
           (session ? (
             <MyOrders />
           ) : (
-            <SignIn onSignIn={doSignIn} reason="Entre para ver os pedidos feitos com esta identidade." />
+            <SignIn
+              onSignIn={doSignIn}
+              onGoogleCredential={doGoogleSignIn}
+              reason="Entre para ver os pedidos feitos com esta identidade."
+            />
           ))}
 
         {route.name === 'signin' && (
           <SignIn
             onSignIn={doSignIn}
+            onGoogleCredential={doGoogleSignIn}
             reason={
               returnTo === '/checkout'
                 ? 'Falta só identificar quem está comprando. Sua escolha de ingressos continua guardada.'

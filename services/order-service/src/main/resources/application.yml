@@ -95,16 +95,27 @@ springdoc:
 
 ticketflow:
   auth:
-    # SEM VALOR PADRÃO, de propósito: variável ausente derruba o boot.
+    # Dois emissores possíveis, e exatamente um precisa estar configurado.
     #
-    # Havia um padrão aqui, e ele estava publicado no repositório — o que torna
-    # trivial forjar um token assinado corretamente para qualquer cliente. Um
-    # ambiente que suba com a chave de exemplo parece seguro e não é, e esse é o
-    # pior estado possível. Falhar alto é melhor.
+    # Com `issuer-uri`, o serviço valida token de um provedor de identidade de
+    # verdade — o Google, em produção — buscando a chave pública no JWKS dele.
+    # É o caminho dos ambientes publicados.
     #
-    # Os perfis `local` e `docker` mais abaixo definem um valor de brincadeira,
-    # porque lá não há nada a proteger.
-    secret: ${TICKETFLOW_AUTH_SECRET}
+    # Sem ele, vale o segredo simétrico abaixo, que é o caminho local.
+    #
+    # Nenhum dos dois tem valor aproveitável aqui. O padrão vazio não é
+    # relaxamento: quem garante que não dá para subir sem verificação é o
+    # SecurityConfiguration, que derruba o boot se faltarem os dois — ou se
+    # vier provedor sem audience. A chave de exemplo já esteve nesta linha, e
+    # estar publicada no repositório torna trivial forjar token para qualquer
+    # cliente.
+    issuer-uri: ${TICKETFLOW_AUTH_ISSUER_URI:}
+    # O client id da nossa aplicação no provedor. Obrigatório junto com o
+    # issuer: o Google assina token para todo mundo, e sem comparar o `aud` um
+    # token emitido para outro site entra aqui como login válido — com o `sub`
+    # real da pessoa.
+    audience: ${TICKETFLOW_AUTH_AUDIENCE:}
+    secret: ${TICKETFLOW_AUTH_SECRET:}
     # Emite token sem verificar nada — qualquer pessoa, qualquer e-mail, sem senha.
     #
     # Desligado por padrão. Já foi `true` aqui, e significava que subir para
@@ -247,7 +258,18 @@ spring:
 
 ticketflow:
   auth:
-    secret: ${TICKETFLOW_AUTH_SECRET}
+    # No Render, quem emite identidade é o Google e este serviço só valida:
+    # `https://accounts.google.com`, de onde o decoder faz a descoberta OIDC e
+    # pega a chave pública sozinho. O client id vai em `audience`.
+    #
+    # Os padrões vazios existem para o mesmo perfil servir à pilha local
+    # apontando para a nuvem (`docker-compose.cloud.yml`), que roda com o
+    # emissor simétrico enquanto se depura banco e Kafka. Não são um
+    # relaxamento: faltando provedor E segredo, ou provedor sem audience, o
+    # SecurityConfiguration derruba o boot — está em JwtDecoderSelectionTest.
+    issuer-uri: ${TICKETFLOW_AUTH_ISSUER_URI:}
+    audience: ${TICKETFLOW_AUTH_AUDIENCE:}
+    secret: ${TICKETFLOW_AUTH_SECRET:}
     # O emissor de token sem senha nunca sobe aqui. O padrão da configuração base
     # já é `false`; esta linha existe para que a intenção fique escrita.
     dev-tokens: false

@@ -82,10 +82,31 @@ const TOKEN_KEY = 'ticketflow.token';
 
 export interface Session {
   token: string;
-  customerId: string;
   name: string;
   email: string;
+  /**
+   * Só o emissor local devolve isto, e nada no front depende dele.
+   *
+   * Quem manda no `customerId` é o backend, que o deriva do token — o front não
+   * tem como calcular o mesmo valor a partir de um token do Google, e não
+   * precisa. Se um dia precisar, o certo é a API expor, não o navegador
+   * adivinhar.
+   */
+  customerId?: string;
 }
+
+/**
+ * O client id do OAuth, quando existe.
+ *
+ * Não é segredo: ele viaja no HTML de qualquer site que use "entrar com
+ * Google", e é por isso que o backend confere o `aud` do token em vez de
+ * confiar em quem chamou.
+ *
+ * Vazio no ambiente local, e é o que faz a tela de entrar cair no emissor de
+ * desenvolvimento — o projeto continua rodando para quem clona o repositório
+ * sem ter conta em provedor nenhum.
+ */
+export const googleClientId: string = (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '').trim();
 
 let session: Session | null = null;
 
@@ -126,6 +147,45 @@ export async function signIn(name: string, email: string): Promise<Session> {
   };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(session));
   return session;
+}
+
+/**
+ * Adota o ID token que o Google acabou de emitir.
+ *
+ * O token vai inteiro para o backend no `Authorization`, e é lá que ele é
+ * verificado: assinatura contra a chave pública do Google, emissor, validade e
+ * `aud` igual ao nosso client id.
+ *
+ * A leitura dos claims aqui é **só para escrever o nome na tela**. Qualquer
+ * pessoa consegue montar um JWT com o nome que quiser — a parte que não dá para
+ * forjar é a assinatura, e conferir assinatura é trabalho de quem guarda os
+ * dados, não do navegador. Se esta função virar fonte de decisão de acesso, o
+ * sistema já está quebrado.
+ */
+export function signInWithGoogle(idToken: string): Session {
+  const claims = readClaimsForDisplay(idToken);
+  session = {
+    token: idToken,
+    name: claims.name?.trim() || 'Cliente',
+    email: claims.email ?? '',
+  };
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(session));
+  return session;
+}
+
+function readClaimsForDisplay(idToken: string): { name?: string; email?: string } {
+  try {
+    const payload = idToken.split('.')[1];
+    if (!payload) return {};
+    // base64url → base64, com o padding que o JWT omite.
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    // atob devolve bytes, não texto: sem o TextDecoder, "Solângela" chega torto.
+    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return {};
+  }
 }
 
 export function signOut() {

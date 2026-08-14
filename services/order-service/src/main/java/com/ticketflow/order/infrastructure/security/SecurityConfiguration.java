@@ -6,7 +6,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,15 +65,59 @@ public class SecurityConfiguration {
     }
 
     /**
-     * Decoder com segredo simétrico.
+     * Um dos dois emissores, escolhido pela configuração.
      *
-     * <p>Escolha consciente para um projeto que roda localmente: apontar para um
-     * provedor real é trocar este bean por
-     * {@code spring.security.oauth2.resourceserver.jwt.issuer-uri}, sem tocar em
-     * nenhuma outra linha do serviço. O resto do código só conhece {@code Jwt}.
+     * <p>Com {@code issuer-uri} definido, o serviço valida token de um provedor
+     * de verdade — o Google, em produção: busca a chave pública no JWKS dele,
+     * confere emissor, validade e {@code audience}. Sem ele, cai no segredo
+     * simétrico local.
+     *
+     * <p>Os dois modos existem de propósito. Exigir uma conta no Google para
+     * rodar o projeto seria atrito puro para quem clona o repositório, e o
+     * caminho local não pode ser o mesmo de produção — lá o token é emitido sem
+     * senha nenhuma. O resto do serviço não sabe qual dos dois está em uso,
+     * porque só conhece {@code Jwt}.
+     *
+     * <p>A promessa que estas linhas sustentam: <strong>não existe configuração
+     * que suba o serviço aceitando token sem verificação</strong>. Faltando os
+     * dois, o boot cai. Com provedor e sem {@code audience}, o boot cai também —
+     * ver {@link AudienceValidator} para o porquê de aceitar qualquer
+     * {@code audience} ser tão ruim quanto não verificar assinatura.
      */
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${ticketflow.auth.secret}") String secret) {
+    public JwtDecoder jwtDecoder(
+            @Value("${ticketflow.auth.issuer-uri:}") String issuerUri,
+            @Value("${ticketflow.auth.audience:}") String audience,
+            @Value("${ticketflow.auth.secret:}") String secret) {
+
+        if (!issuerUri.isBlank()) {
+            if (audience.isBlank()) {
+                throw new IllegalStateException(
+                        "ticketflow.auth.audience é obrigatório junto com issuer-uri: "
+                                + "sem ele, um token emitido para outro aplicativo do mesmo "
+                                + "provedor entra como login válido");
+            }
+
+            // withIssuerLocation faz a descoberta OIDC no boot e monta o decoder a
+            // partir do que o provedor publica. Custa uma chamada de rede na
+            // subida e paga com o oposto de um JWKS fixo no código: se o provedor
+            // rotacionar a chave ou mudar o endpoint, nada aqui precisa mudar.
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    // Emissor e validade. O emissor entrar aqui também protege a
+                    // identidade: AuthenticatedCustomer deriva o id de `issuer|sub`,
+                    // então aceitar duas grafias do mesmo emissor daria dois ids
+                    // diferentes para a mesma pessoa.
+                    JwtValidators.createDefaultWithIssuer(issuerUri),
+                    new AudienceValidator(audience)));
+            return decoder;
+        }
+
+        if (secret.isBlank()) {
+            throw new IllegalStateException(
+                    "configure ticketflow.auth.issuer-uri (provedor de identidade) "
+                            + "ou ticketflow.auth.secret (emissor local)");
+        }
         if (secret.length() < 32) {
             // HS256 com segredo curto é criptografia de brinquedo. Falhar no boot é
             // melhor que rodar parecendo seguro.

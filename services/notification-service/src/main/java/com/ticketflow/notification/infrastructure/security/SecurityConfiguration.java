@@ -6,7 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -36,8 +38,38 @@ public class SecurityConfiguration {
                 .build();
     }
 
+    /**
+     * Mesma escolha do Order Service, e precisa continuar sendo.
+     *
+     * <p>Os dois validam token do mesmo emissor. Se um aceitasse o provedor e o
+     * outro só o segredo local, o cliente compraria e não conseguiria ver o
+     * ingresso — com 401 numa tela e nada de errado na outra.
+     */
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${ticketflow.auth.secret}") String secret) {
+    public JwtDecoder jwtDecoder(
+            @Value("${ticketflow.auth.issuer-uri:}") String issuerUri,
+            @Value("${ticketflow.auth.audience:}") String audience,
+            @Value("${ticketflow.auth.secret:}") String secret) {
+
+        if (!issuerUri.isBlank()) {
+            if (audience.isBlank()) {
+                throw new IllegalStateException(
+                        "ticketflow.auth.audience é obrigatório junto com issuer-uri: "
+                                + "sem ele, um token emitido para outro aplicativo do mesmo "
+                                + "provedor entra como login válido");
+            }
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefaultWithIssuer(issuerUri),
+                    new AudienceValidator(audience)));
+            return decoder;
+        }
+
+        if (secret.isBlank()) {
+            throw new IllegalStateException(
+                    "configure ticketflow.auth.issuer-uri (provedor de identidade) "
+                            + "ou ticketflow.auth.secret (emissor local)");
+        }
         if (secret.length() < 32) {
             throw new IllegalStateException("ticketflow.auth.secret precisa de pelo menos 32 caracteres");
         }

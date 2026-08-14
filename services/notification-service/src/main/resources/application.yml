@@ -56,14 +56,15 @@ spring:
 
 ticketflow:
   auth:
-    # Mesmo segredo que o Order Service valida: os dois são resource servers do
-    # mesmo provedor. Em produção vira issuer-uri apontando para o provedor real.
+    # As mesmas três linhas do Order Service, e precisam continuar iguais: os dois
+    # são resource servers do mesmo emissor. Se um aceitasse o provedor e o outro
+    # só o segredo local, o cliente compraria e não veria o ingresso.
     #
-    # SEM VALOR PADRÃO, pela mesma razão do Order Service: o padrão que havia aqui
-    # está publicado no repositório, e um ambiente que suba com ele aceita token
-    # forjado por qualquer pessoa. O perfil `docker` define um valor de
-    # brincadeira; fora dele, variável ausente derruba o boot.
-    secret: ${TICKETFLOW_AUTH_SECRET}
+    # Nenhum valor aproveitável aqui — quem derruba o boot quando falta
+    # configuração é o SecurityConfiguration, não o padrão do YAML.
+    issuer-uri: ${TICKETFLOW_AUTH_ISSUER_URI:}
+    audience: ${TICKETFLOW_AUTH_AUDIENCE:}
+    secret: ${TICKETFLOW_AUTH_SECRET:}
 
   archive:
     # Desligado por padrão: o serviço tem que rodar sem AWS nenhuma, e ninguém
@@ -150,9 +151,15 @@ spring:
 
 ticketflow:
   auth:
-    # O mesmo segredo do Order Service: os dois validam o token do mesmo emissor.
-    # Quando o Google entrar, os dois trocam isto por `issuer-uri` ao mesmo tempo.
-    secret: ${TICKETFLOW_AUTH_SECRET}
+    # O mesmo provedor que o Order Service valida — trocaram juntos, como tinha
+    # que ser: os dois olham para o mesmo emissor e para o mesmo client id.
+    #
+    # Padrões vazios pela mesma razão de lá: a pilha local apontando para a
+    # nuvem roda com o emissor simétrico. Quem derruba o boot quando falta
+    # configuração é o SecurityConfiguration, não o YAML.
+    issuer-uri: ${TICKETFLOW_AUTH_ISSUER_URI:}
+    audience: ${TICKETFLOW_AUTH_AUDIENCE:}
+    secret: ${TICKETFLOW_AUTH_SECRET:}
   archive:
     # Desligado até existir um bucket de verdade. Ver a fase 6 do roadmap.
     enabled: ${TICKETFLOW_ARCHIVE_ENABLED:false}

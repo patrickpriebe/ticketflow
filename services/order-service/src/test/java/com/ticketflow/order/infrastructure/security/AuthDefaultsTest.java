@@ -50,16 +50,21 @@ class AuthDefaultsTest {
     }
 
     @Test
-    @DisplayName("o segredo de assinatura nao tem valor padrao")
-    void signingSecretHasNoDefault() throws IOException {
+    @DisplayName("o segredo de assinatura nao tem chave de exemplo na configuracao base")
+    void signingSecretHasNoUsableDefault() throws IOException {
         assertThat(baseDocument())
                 .as("""
-                        ticketflow.auth.secret não pode ter padrão na configuração
-                        base: um ambiente que suba com a chave de exemplo — que está
-                        publicada neste repositório — aceita token forjado por
-                        qualquer pessoa. Sem padrão, o boot falha alto, que é o
-                        comportamento desejado.""")
-                .contains("secret: ${TICKETFLOW_AUTH_SECRET}")
-                .doesNotContain("secret: ${TICKETFLOW_AUTH_SECRET:");
+                        A configuração base não pode entregar uma chave de assinatura
+                        pronta. A chave de exemplo está publicada neste repositório, e
+                        um ambiente que suba com ela aceita token forjado por qualquer
+                        pessoa.
+
+                        O padrão vazio é o que existe aqui, e não é um relaxamento: com
+                        provedor de identidade configurado o segredo simétrico não é
+                        usado, e sem provedor nem segredo o boot cai — quem garante isso
+                        agora é SecurityConfiguration, coberto por
+                        JwtDecoderSelectionTest.""")
+                .contains("secret: ${TICKETFLOW_AUTH_SECRET:}")
+                .doesNotContain("desenvolvimento-local");
     }
 }

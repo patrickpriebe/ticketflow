@@ -36,7 +36,12 @@ services:
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
       KAFKA_USER: ${KAFKA_USER}
       KAFKA_PASSWORD: ${KAFKA_PASSWORD}
-      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET}
+      # Os três juntos, e o serviço escolhe: com issuer e audience preenchidos
+      # vale o Google; com só o segredo, vale o emissor simétrico. Vazios os
+      # três, o boot cai — que é o comportamento desejado.
+      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET:-}
+      TICKETFLOW_AUTH_ISSUER_URI: ${TICKETFLOW_AUTH_ISSUER_URI:-}
+      TICKETFLOW_AUTH_AUDIENCE: ${TICKETFLOW_AUTH_AUDIENCE:-}
       # 512 MB é o tamanho da instância gratuita do Render. Sem isto a JVM
       # calcula o heap pelo que enxerga da máquina e o contêiner morre por
       # memória lá, não aqui — melhor descobrir agora.
@@ -102,7 +107,12 @@ services:
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
       KAFKA_USER: ${KAFKA_USER}
       KAFKA_PASSWORD: ${KAFKA_PASSWORD}
-      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET}
+      # Os três juntos, e o serviço escolhe: com issuer e audience preenchidos
+      # vale o Google; com só o segredo, vale o emissor simétrico. Vazios os
+      # três, o boot cai — que é o comportamento desejado.
+      TICKETFLOW_AUTH_SECRET: ${TICKETFLOW_AUTH_SECRET:-}
+      TICKETFLOW_AUTH_ISSUER_URI: ${TICKETFLOW_AUTH_ISSUER_URI:-}
+      TICKETFLOW_AUTH_AUDIENCE: ${TICKETFLOW_AUTH_AUDIENCE:-}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-8083}:8083"

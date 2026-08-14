@@ -669,6 +669,17 @@
   margin-top: var(--space-5);
 }
 
+/* O botão do Google é um iframe montado pelo script deles: a aparência interna
+   não é nossa para estilizar. O que cabe aqui é reservar o espaço e centralizar
+   — e a altura mínima evita o pulo de layout entre a página pintar e o script
+   terminar de carregar. */
+.google-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: var(--space-5);
+}
+
 /* --- Responsivo ----------------------------------------------------------- */
 
 @media (max-width: 1000px) {
