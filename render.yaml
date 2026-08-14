@@ -1,0 +1,133 @@
+# =============================================================================
+# Blueprint do Render: os três serviços descritos em código, não em cliques.
+#
+# Aplicar: no painel do Render, New > Blueprint, apontando para este repositório.
+#
+# Nenhum segredo aqui. Toda variável sensível está marcada `sync: false`, o que
+# faz o Render pedi-la no momento de aplicar o blueprint e guardá-la no painel.
+# Este arquivo vai para o GitHub; os valores não.
+#
+# -----------------------------------------------------------------------------
+# O limite que moldou este arquivo
+#
+# O plano gratuito dá 750 horas de instância por mês para o workspace INTEIRO.
+# Três serviços acordados o mês todo precisariam de 2.190. Por isso nenhum deles
+# fica acordado o tempo todo: eles hibernam, e um ping externo os acorda numa
+# janela de algumas horas por dia.
+#
+# Isso tem uma consequência que não é obvia e precisa ser dita: o Payment e o
+# Notification são consumidores de Kafka, e ninguém faz HTTP para eles. Se
+# dormirem, um pedido é aceito e fica PENDING para sempre — o site parece
+# funcionar e o pagamento nunca resolve. As mensagens não se perdem (ficam no
+# tópico), mas nada as consome até alguém acordar o serviço.
+#
+# Em ambiente pago isso simplesmente não existe: instância paga não hiberna.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------- order ----
+  - type: web
+    name: ticketflow-order
+    runtime: docker
+    plan: free
+    region: virginia          # a região do Render mais perto do Brasil
+    dockerfilePath: ./services/order-service/Dockerfile
+    dockerContext: .          # os Dockerfiles copiam `services/<nome>/src`
+    healthCheckPath: /actuator/health/readiness
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: cloud
+      # 512 MB na instância gratuita. Sem isto a JVM dimensiona o heap pelo que
+      # enxerga da máquina hospedeira e o contêiner morre por memória.
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=75
+      # Supabase, session pooler: a conexão direta responde só em IPv6 e o Render
+      # sai por IPv4.
+      - key: POSTGRES_URL
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: KAFKA_BOOTSTRAP
+        sync: false
+      - key: KAFKA_USER
+        sync: false
+      - key: KAFKA_PASSWORD
+        sync: false
+      - key: TICKETFLOW_AUTH_SECRET
+        sync: false
+
+  # -------------------------------------------------------------- payment ----
+  - type: web
+    name: ticketflow-payment
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./services/payment-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health/readiness
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: cloud
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=75
+      # O provedor de verdade. O gateway simulado não sobe: ele existe para o
+      # ambiente local, e aqui quem responde é o Stripe.
+      - key: TICKETFLOW_GATEWAY_PROVIDER
+        value: stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # Vem do endpoint de webhook cadastrado no painel do Stripe, apontando para
+      # https://ticketflow-payment.onrender.com/webhooks/stripe
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Vazio aqui de propósito: confirmar cartão com meio de pagamento fictício
+      # é coisa de ambiente de teste local.
+      - key: STRIPE_TEST_CARD
+        value: ""
+      # Neon
+      - key: POSTGRES_URL
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: KAFKA_BOOTSTRAP
+        sync: false
+      - key: KAFKA_USER
+        sync: false
+      - key: KAFKA_PASSWORD
+        sync: false
+
+  # --------------------------------------------------------- notification ----
+  - type: web
+    name: ticketflow-notification
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./services/notification-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health/readiness
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: cloud
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=75
+      # MongoDB Atlas. A URI carrega usuário e senha, então é segredo inteiro.
+      - key: MONGO_URI
+        sync: false
+      - key: KAFKA_BOOTSTRAP
+        sync: false
+      - key: KAFKA_USER
+        sync: false
+      - key: KAFKA_PASSWORD
+        sync: false
+      - key: TICKETFLOW_AUTH_SECRET
+        sync: false
+      # Arquivamento de ingresso em S3 fica para depois; sem bucket, desligado.
+      - key: TICKETFLOW_ARCHIVE_ENABLED
+        value: "false"
