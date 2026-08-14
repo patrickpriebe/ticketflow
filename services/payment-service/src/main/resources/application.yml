@@ -79,6 +79,17 @@ management:
       application: ${spring.application.name}
 
 ticketflow:
+  auth:
+    # As mesmas três linhas dos outros dois serviços — os três validam token do
+    # mesmo emissor. Aqui elas entraram quando o navegador passou a consultar a
+    # cobrança para confirmar o cartão.
+    #
+    # Nenhum valor aproveitável: quem derruba o boot quando falta configuração é
+    # o SecurityConfiguration, não o padrão do YAML.
+    issuer-uri: ${TICKETFLOW_AUTH_ISSUER_URI:}
+    audience: ${TICKETFLOW_AUTH_AUDIENCE:}
+    secret: ${TICKETFLOW_AUTH_SECRET:}
+
   gateway:
     # `http` usa o gateway simulado; `stripe` usa o provedor de verdade. Os dois
     # implementam a mesma porta e o caso de uso não sabe a diferença.
@@ -123,6 +134,13 @@ spring:
     username: ${POSTGRES_USER:ticketflow}
     password: ${POSTGRES_PASSWORD:ticketflow}
 
+ticketflow:
+  auth:
+    # Chave de brincadeira, como nos outros dois: na máquina de quem desenvolve
+    # não há nada a proteger, e exigir provedor de identidade de pé para rodar o
+    # projeto seria atrito puro.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
+
 ---
 # Kubernetes. Tudo vem do ConfigMap e do Secret, sem defaults: variável faltando
 # tem que quebrar o boot, não conectar em algo inesperado.
@@ -154,6 +172,9 @@ spring:
     bootstrap-servers: kafka:19092
 
 ticketflow:
+  auth:
+    # O compose é ambiente de demonstração, mesmo segredo dos outros dois.
+    secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
   gateway:
     base-url: http://payment-gateway:8080
 

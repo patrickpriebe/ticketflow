@@ -74,6 +74,17 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!--
+            Resource server, como os outros dois serviços.
+            Entrou quando o navegador passou a buscar aqui o `client_secret` da
+            cobrança para confirmar o cartão: é dado de um cliente específico e
+            não pode sair sem que o token diga quem está pedindo.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-stream-kafka</artifactId>

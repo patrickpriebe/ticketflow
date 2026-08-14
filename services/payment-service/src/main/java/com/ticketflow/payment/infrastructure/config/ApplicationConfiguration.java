@@ -1,9 +1,11 @@
 package com.ticketflow.payment.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketflow.payment.application.port.in.FindOrderPaymentUseCase;
 import com.ticketflow.payment.application.port.in.ProcessOrderPaymentUseCase;
 import com.ticketflow.payment.application.port.out.DomainEventPublisher;
 import com.ticketflow.payment.application.port.out.PaymentGateway;
+import com.ticketflow.payment.application.port.out.PaymentIntentReader;
 import com.ticketflow.payment.application.port.out.PaymentRepository;
 import com.ticketflow.payment.application.port.out.ProcessedEventRepository;
 import com.ticketflow.payment.application.port.out.UnitOfWork;
@@ -11,12 +13,14 @@ import com.ticketflow.payment.application.strategy.BoletoPaymentStrategy;
 import com.ticketflow.payment.application.strategy.CreditCardPaymentStrategy;
 import com.ticketflow.payment.application.strategy.PaymentStrategies;
 import com.ticketflow.payment.application.strategy.PixPaymentStrategy;
+import com.ticketflow.payment.application.usecase.FindOrderPayment;
 import com.ticketflow.payment.application.usecase.ProcessOrderPayment;
 import com.stripe.StripeClient;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase;
 import com.ticketflow.payment.application.port.out.WebhookEventRepository;
 import com.ticketflow.payment.application.usecase.SettlePaymentFromProvider;
 import com.ticketflow.payment.infrastructure.gateway.HttpPaymentGateway;
+import com.ticketflow.payment.infrastructure.gateway.StripeIntentReader;
 import com.ticketflow.payment.infrastructure.gateway.StripePaymentGateway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,6 +104,35 @@ public class ApplicationConfiguration {
                 StripeClient.builder().setApiKey(secretKey).build(),
                 registry,
                 testCardPaymentMethod);
+    }
+
+    /**
+     * Leitura da cobrança no provedor. Só existe com o Stripe montado — o
+     * gateway simulado não tem confirmação no navegador, e a ausência do bean
+     * seria um erro de contexto; por isso o caminho simulado ganha o leitor
+     * vazio logo abaixo.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "ticketflow.gateway.provider", havingValue = "stripe")
+    public PaymentIntentReader stripeIntentReader(@Value("${ticketflow.stripe.secret-key}") String secretKey) {
+        return new StripeIntentReader(StripeClient.builder().setApiKey(secretKey).build());
+    }
+
+    /**
+     * No ambiente simulado não há segredo a devolver: o cartão é resolvido na
+     * própria chamada do gateway, sem navegador no meio. Devolver vazio faz o
+     * front simplesmente não oferecer a confirmação, em vez de quebrar.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "ticketflow.gateway.provider", havingValue = "http", matchIfMissing = true)
+    public PaymentIntentReader noopIntentReader() {
+        return transactionId -> java.util.Optional.empty();
+    }
+
+    @Bean
+    public FindOrderPaymentUseCase findOrderPaymentUseCase(PaymentRepository payments,
+                                                           PaymentIntentReader intents) {
+        return new FindOrderPayment(payments, intents);
     }
 
     @Bean
