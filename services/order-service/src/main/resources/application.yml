@@ -219,6 +219,18 @@ spring:
     url: ${POSTGRES_URL}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+    hikari:
+      # Cinco, não os dez do padrão local.
+      #
+      # O pooler do Supabase no plano gratuito aceita 15 conexões no total. Dez
+      # por instância significa que a segunda instância a subir não consegue
+      # abrir o pool e o serviço morre no boot, durante o Flyway — foi
+      # exatamente assim que o primeiro deploy falhou, com a instância local
+      # segurando as conexões.
+      #
+      # Cinco sobra para um serviço que faz transações curtas, e deixa espaço
+      # para uma segunda instância e para quem estiver depurando pelo psql.
+      maximum-pool-size: ${POSTGRES_POOL_SIZE:5}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP}
     security:

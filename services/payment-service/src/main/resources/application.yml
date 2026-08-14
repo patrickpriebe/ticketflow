@@ -175,6 +175,11 @@ spring:
     url: ${POSTGRES_URL}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+    hikari:
+      # Mesma razão do Order Service: banco gerenciado gratuito tem teto baixo de
+      # conexões, e duas instâncias com pool de dez cada estouram o limite. A que
+      # subir depois morre no boot.
+      maximum-pool-size: ${POSTGRES_POOL_SIZE:5}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP}
     security:
