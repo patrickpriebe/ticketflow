@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/v1/tickets/:path*",
+      "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets/:path*"
+    },
+    {
+      "source": "/api/v1/tickets",
+      "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://ticketflow-order.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
