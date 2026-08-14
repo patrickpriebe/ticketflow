@@ -150,6 +150,115 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Funil do pedido",
+      "description": "As quatro etapas lado a lado: aceito na API, publicado no Kafka pelo relay, consumido pelo Payment, e resolvido. Num sistema assíncrono, saber que 'está lento' não ajuda — o que se precisa saber é em qual degrau parou. Linhas que se descolam mostram exatamente isso.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "fillOpacity": 0, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{application=\"order-service\",uri=\"/api/v1/orders\",method=\"POST\",status=\"202\"}[5m]))",
+          "legendFormat": "1. aceitos na API",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(kafka_producer_record_send_total{application=\"order-service\"}[5m]))",
+          "legendFormat": "2. publicados no Kafka",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(kafka_consumer_fetch_manager_records_consumed_total{application=\"payment-service\"}[5m]))",
+          "legendFormat": "3. consumidos pelo Payment",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(increase(ticketflow_payment_gateway_calls_seconds_count[5m]))",
+          "legendFormat": "4. cobranças tentadas",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Lag por grupo de consumidor",
+      "description": "Quantas mensagens cada consumidor tem para trás. Zero é o normal. Subindo em linha reta significa que o consumidor parou mas o produtor não — e é a diferença entre 'está devagar' e 'parou'. Este número é o que responde à pergunta 'está tudo sendo processado?'.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 10 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(kafka_consumer_fetch_manager_records_lag_max) by (application, topic)",
+          "legendFormat": "{{application}} · {{topic}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Webhook do Stripe por desfecho",
+      "description": "`assinatura_invalida` subindo é o segredo errado no ambiente — e o sintoma lá fora é pedido que nunca sai de PENDING, sem erro em lugar nenhum, porque a resposta do provedor está batendo na porta e sendo recusada. `nao_configurado` é o serviço sem segredo nenhum.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 37 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(ticketflow_webhook_received_total[5m])) by (outcome) * 60",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Idade da mensagem mais velha no outbox",
+      "description": "Diz mais que a contagem ao lado. Cinquenta mensagens de dois segundos é pico de tráfego; uma parada há dez minutos é incidente — e as duas coisas têm a mesma cara num gráfico de quantidade. Os dois serviços têm outbox, e o do Payment é por onde sai o PAGAMENTO_APROVADO.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 37 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "fillOpacity": 10 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 30 },
+              { "color": "red", "value": 120 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(ticketflow_outbox_oldest_pending_seconds) by (application)",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }

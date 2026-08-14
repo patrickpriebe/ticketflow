@@ -29,4 +29,16 @@ public interface JpaOutboxRepository extends JpaRepository<OutboxMessageEntity, 
             order by m.createdAt asc
             """)
     List<OutboxMessageEntity> findDispatchable(@Param("now") Instant now, Pageable pageable);
+
+    long countByStatus(String status);
+
+    /**
+     * Quando a mensagem pendente mais antiga foi escrita.
+     *
+     * <p>Diz mais que a contagem. Cinquenta mensagens de dois segundos é um pico
+     * de tráfego; uma só, parada há dez minutos, é incidente — e as duas
+     * situações têm exatamente a mesma cara num gráfico de quantidade.
+     */
+    @Query("select min(m.createdAt) from OutboxMessageEntity m where m.status = 'PENDING'")
+    Instant oldestPendingCreatedAt();
 }

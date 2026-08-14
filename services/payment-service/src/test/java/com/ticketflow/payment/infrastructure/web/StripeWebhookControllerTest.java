@@ -1,5 +1,6 @@
 package com.ticketflow.payment.infrastructure.web;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase.Command;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase.Result;
@@ -41,7 +42,7 @@ class StripeWebhookControllerTest {
     @BeforeEach
     void setUp() {
         useCase = new RecordingUseCase();
-        controller = new StripeWebhookController(useCase, SECRET);
+        controller = new StripeWebhookController(useCase, SECRET, new SimpleMeterRegistry());
     }
 
     @Test
@@ -86,7 +87,7 @@ class StripeWebhookControllerTest {
     @Test
     @DisplayName("sem segredo configurado o endpoint nao aceita nada")
     void refusesWhenSecretIsMissing() {
-        StripeWebhookController semSegredo = new StripeWebhookController(useCase, "");
+        StripeWebhookController semSegredo = new StripeWebhookController(useCase, "", new SimpleMeterRegistry());
 
         ResponseEntity<String> response = semSegredo.receive(succeededEvent("pi_1", "evt_1"), "t=1,v1=abc");
 

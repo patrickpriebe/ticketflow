@@ -8,6 +8,7 @@ import com.stripe.net.Webhook;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase.Command;
 import com.ticketflow.payment.domain.model.AttemptOutcome;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,11 +48,31 @@ public class StripeWebhookController {
 
     private final SettlePaymentFromProviderUseCase settlePayment;
     private final String webhookSecret;
+    private final MeterRegistry registry;
 
     public StripeWebhookController(SettlePaymentFromProviderUseCase settlePayment,
-                                   @Value("${ticketflow.stripe.webhook-secret}") String webhookSecret) {
+                                   @Value("${ticketflow.stripe.webhook-secret}") String webhookSecret,
+                                   MeterRegistry registry) {
         this.settlePayment = settlePayment;
         this.webhookSecret = webhookSecret;
+        this.registry = registry;
+    }
+
+    /**
+     * Conta cada webhook pelo que aconteceu com ele.
+     *
+     * <p>Sem isto, assinatura sendo recusada em massa é invisível daqui: o log
+     * tem a linha, mas ninguém lê log que não dispara nada. E o sintoma do lado
+     * de fora é o pior possível — pedidos parando de sair de PENDING, sem erro
+     * em lugar nenhum, porque a resposta do provedor está batendo na porta e
+     * sendo recusada.
+     *
+     * <p>Um rótulo por desfecho, e não um contador por tipo: o que se quer ver
+     * num gráfico é a proporção entre aceito e recusado.
+     */
+    private void count(String outcome) {
+        registry.counter("ticketflow.webhook.received", "provider", PROVIDER, "outcome", outcome)
+                .increment();
     }
 
     @PostMapping
@@ -63,6 +84,7 @@ public class StripeWebhookController {
             // Sem segredo não há como verificar nada, e aceitar seria pior do que
             // recusar: o serviço passaria a confiar em qualquer requisição.
             log.error("Webhook recebido sem ticketflow.stripe.webhook-secret configurado");
+            count("nao_configurado");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("webhook nao configurado");
         }
 
@@ -73,18 +95,29 @@ public class StripeWebhookController {
             // 400 e nada mais. Nenhum log do corpo: se a assinatura não confere, o
             // conteúdo é de origem desconhecida e não merece ir para o log.
             log.warn("Webhook com assinatura invalida recusado");
+            count("assinatura_invalida");
             return ResponseEntity.badRequest().body("assinatura invalida");
         } catch (Exception e) {
             log.warn("Webhook com corpo ilegivel recusado: {}", e.getMessage());
+            count("corpo_invalido");
             return ResponseEntity.badRequest().body("corpo invalido");
         }
 
         return switch (event.getType()) {
-            case "payment_intent.succeeded" -> settle(event, AttemptOutcome.APPROVED);
-            case "payment_intent.payment_failed" -> settle(event, AttemptOutcome.REJECTED);
+            case "payment_intent.succeeded" -> {
+                count("aprovado");
+                yield settle(event, AttemptOutcome.APPROVED);
+            }
+            case "payment_intent.payment_failed" -> {
+                count("recusado");
+                yield settle(event, AttemptOutcome.REJECTED);
+            }
             // Todo o resto é ruído para este serviço. 200 para o Stripe parar de
             // reenviar; ignorar sem responder faria a fila dele crescer à toa.
-            default -> ResponseEntity.ok("ignorado: " + event.getType());
+            default -> {
+                count("ignorado");
+                yield ResponseEntity.ok("ignorado: " + event.getType());
+            }
         };
     }
 
