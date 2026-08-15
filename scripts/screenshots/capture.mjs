@@ -26,6 +26,15 @@ import { dirname, join } from 'node:path';
 
 const LOCAL = 'http://localhost:5173';
 const DEPLOYED = 'https://ticketflow-br.vercel.app';
+const GRAFANA = 'http://localhost:3002';
+
+/**
+ * `node capture.mjs grafana` captura só o dashboard.
+ *
+ * Separado porque o fluxo de compra cria um pedido de verdade a cada execução, e
+ * repetir isso só para refazer uma imagem de painel seria sujar o banco à toa.
+ */
+const only = process.argv[2];
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = join(here, '..', '..', 'docs', 'img');
@@ -45,10 +54,48 @@ async function shot(page, name, { fullPage = false } = {}) {
   console.log(`  ✓ ${name}.png`);
 }
 
+/**
+ * O dashboard do Grafana.
+ *
+ * `kiosk` tira o menu lateral e o cabeçalho — numa imagem de README o que
+ * interessa são os painéis, não a navegação da ferramenta. A janela é alta de
+ * propósito: os onze painéis não cabem em 900px, e uma captura cortada no meio
+ * de um gráfico é pior que nenhuma.
+ */
+async function captureGrafana(browser) {
+  const context = await browser.newContext({
+    viewport: { width: 1600, height: 2200 },
+    deviceScaleFactor: 1,
+    locale: 'pt-BR',
+    colorScheme: 'light',
+  });
+  const page = await context.newPage();
+
+  await page.goto(`${GRAFANA}/d/ticketflow-overview?from=now-1h&to=now&kiosk`,
+    { waitUntil: 'domcontentloaded' });
+
+  // Os painéis carregam por consulta, não com a página. Esperar o texto de
+  // carregamento sumir é mais confiável que esperar um tempo fixo.
+  await page.getByText('Loading plugin panel').first()
+    .waitFor({ state: 'detached', timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(6000);
+
+  await shot(page, '11-grafana', { fullPage: true });
+  await context.close();
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
 
   const browser = await chromium.launch({ channel: 'chrome' });
+
+  if (only === 'grafana') {
+    console.log('Capturando o dashboard…');
+    await captureGrafana(browser);
+    await browser.close();
+    console.log('\nPronto. Arquivo em docs/img/');
+    return;
+  }
   const context = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: 1,
@@ -149,6 +196,9 @@ async function main() {
   await settle(deployedPage, 2500);
   await shot(deployedPage, '10-signin');
   await deployed.close();
+
+  console.log('Dashboard…');
+  await captureGrafana(browser);
 
   await browser.close();
   console.log(`\nPronto. Arquivos em docs/img/`);

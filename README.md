@@ -444,6 +444,15 @@ docker compose --profile apps --profile observability up -d
 Grafana at http://localhost:3002 comes up with the datasource and the **TicketFlow —
 visão geral** dashboard provisioned. No login, nothing to click.
 
+![Grafana dashboard](docs/img/11-grafana.png)
+
+That capture is real traffic against the local stack, produced by the same script that
+generates the product screenshots (`node scripts/screenshots/capture.mjs grafana`).
+
+The webhook panel reads *No data* on purpose: locally the payment provider is the
+simulated gateway, so no Stripe callback ever arrives. It fills up in the deployed
+environment, which is the only place a real webhook exists.
+
 Eleven panels, each answering a question that only exists because the system is
 asynchronous:
 
