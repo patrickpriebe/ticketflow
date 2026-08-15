@@ -1,13 +1,13 @@
-# Modelagem de dados
+# Data modelling
 
-Arquivos de origem (a fonte da verdade é sempre a migration, não este documento):
+Source files (the migration is always the source of truth, not this document):
 
-| Onde | O quê |
+| Where | What |
 |---|---|
-| [`services/order-service/.../V1__init_order_schema.sql`](../services/order-service/src/main/resources/db/migration/V1__init_order_schema.sql) | schema do `ticketflow_orders` |
-| [`services/payment-service/.../V1__init_payment_schema.sql`](../services/payment-service/src/main/resources/db/migration/V1__init_payment_schema.sql) | schema do `ticketflow_payments` |
-| [`services/order-service/.../R__seed_demo_catalogue.sql`](../services/order-service/src/main/resources/db/seed/R__seed_demo_catalogue.sql) | catálogo de demonstração (só em dev) |
-| [`infra/mongo/init/01-init-notification-db.js`](../infra/mongo/init/01-init-notification-db.js) | coleções do `ticketflow_notifications` |
+| [`services/order-service/.../V1__init_order_schema.sql`](../services/order-service/src/main/resources/db/migration/V1__init_order_schema.sql) | `ticketflow_orders` schema |
+| [`services/payment-service/.../V1__init_payment_schema.sql`](../services/payment-service/src/main/resources/db/migration/V1__init_payment_schema.sql) | `ticketflow_payments` schema |
+| [`services/order-service/.../R__seed_demo_catalogue.sql`](../services/order-service/src/main/resources/db/seed/R__seed_demo_catalogue.sql) | demo catalogue (development only) |
+| [`infra/mongo/init/01-init-notification-db.js`](../infra/mongo/init/01-init-notification-db.js) | `ticketflow_notifications` collections |
 
 ---
 
@@ -16,121 +16,127 @@ Arquivos de origem (a fonte da verdade é sempre a migration, não este document
 ```
 events ──1:N──► ticket_categories ◄──N:1── order_items ──N:1──► orders ──1:N──► order_status_history
                                                                    │
-                                                                   └── (mesma transação) ──► outbox_messages
+                                                                   └── (same transaction) ──► outbox_messages
 ```
 
-| Tabela | Papel |
+| Table | Role |
 |---|---|
-| `events` | show, jogo, espetáculo — o que se vende |
-| `ticket_categories` | faixas de preço do evento (Pista, VIP…) e o estoque de cada uma |
-| `orders` | o pedido; nasce `PENDING` |
-| `order_items` | uma linha por categoria comprada |
-| `order_status_history` | trilha append-only das transições de status |
-| `outbox_messages` | eventos a publicar no Kafka |
-| `processed_events` | inbox de idempotência (o serviço também consome) |
+| `events` | Show, match, performance — what is being sold |
+| `ticket_categories` | Price tiers of an event and the inventory of each |
+| `orders` | The order; born `PENDING` |
+| `order_items` | One row per purchased category |
+| `order_status_history` | Append-only trail of status transitions |
+| `outbox_messages` | Events waiting to be published to Kafka |
+| `processed_events` | Idempotency inbox (the service also consumes) |
 
-### Decisões que valem explicar numa entrevista
+### Decisions worth explaining in an interview
 
-**Preço copiado em `order_items.unit_price`.** Um pedido de ontem tem que continuar
-mostrando o preço de ontem. Se o valor viesse de um `JOIN` com `ticket_categories`,
-um reajuste de preço reescreveria o histórico de todo mundo.
+**The price is copied into `order_items.unit_price`.** Yesterday's order must keep
+showing yesterday's price. If the value came from a `JOIN` with `ticket_categories`, a
+price change would rewrite everybody's history.
 
-**`orders.idempotency_key UNIQUE`.** O cliente manda o header `Idempotency-Key`. Se
-a rede cair depois do servidor ter gravado, o retry bate na constraint e devolve o
-pedido original em vez de criar um segundo. Sem isso, timeout de rede vira cobrança
-dupla.
+**`orders.idempotency_key UNIQUE`.** The client sends an `Idempotency-Key` header. If
+the network drops after the server has already written, the retry hits the constraint
+and returns the original order instead of creating a second one. Without it, a network
+timeout becomes a double charge.
 
-**`version BIGINT` em `orders` e `ticket_categories`.** Optimistic locking do JPA.
-Duas compras simultâneas do último ingresso: uma vence, a outra leva
-`OptimisticLockException` e é rejeitada — em vez de as duas venderem o mesmo lugar.
+**`version BIGINT` on `orders` and `ticket_categories`.** JPA optimistic locking. Two
+simultaneous purchases of the last ticket: one wins, the other gets an
+`OptimisticLockException` and is rejected — instead of both selling the same seat.
 
-**`CHECK (reserved_quantity + sold_quantity <= total_quantity)`.** A regra de não
-vender mais do que existe fica no banco, não só no código Java. Bug na aplicação
-não consegue gravar estado inválido.
+**`CHECK (reserved_quantity + sold_quantity <= total_quantity)`.** The rule about not
+selling more than exists lives in the database, not only in Java. An application bug
+cannot write invalid state.
 
-**Índice parcial `ix_outbox_dispatchable`.** O relay só olha linhas `PENDING`. Um
-índice sobre a tabela inteira cresceria para sempre; o parcial só indexa o que a
-consulta usa, e encolhe conforme as mensagens são publicadas.
+**The partial index `ix_outbox_dispatchable`.** The relay only looks at `PENDING` rows.
+An index over the whole table would grow forever; the partial one indexes only what the
+query uses, and shrinks as messages are published.
 
-**Dinheiro em `NUMERIC(12,2)`, nunca `float`.** `0.1 + 0.2` em ponto flutuante não
-dá `0.3`, e em valor financeiro isso é defeito. Mapeia para `BigDecimal` no Java.
+**Money in `NUMERIC(12,2)`, never `float`.** `0.1 + 0.2` in floating point is not `0.3`,
+and in a financial amount that is a defect. It maps to `BigDecimal` in Java.
 
-**Timestamps em `TIMESTAMPTZ`.** Guarda em UTC e converte na borda. Show às 21h em
-São Paulo e um servidor em outro fuso não podem discordar sobre quando a venda fecha.
+**Timestamps in `TIMESTAMPTZ`.** Stored in UTC and converted at the edge. A show at 9pm
+in São Paulo and a server in another timezone cannot disagree about when sales close.
 
-### Ciclo de vida do pedido
+### Order lifecycle
 
 ```
                  ┌──────── PAGAMENTO_APROVADO ───────► PAID
    POST /orders  │
   ─────────────► PENDING ── PAGAMENTO_RECUSADO ──────► REJECTED
                  │
-                 ├── cliente cancela ────────────────► CANCELLED
-                 └── expirou sem pagamento ──────────► EXPIRED
+                 ├── customer cancels ───────────────► CANCELLED
+                 └── expired without payment ────────► EXPIRED
 ```
 
-Só a seta de entrada em `PENDING` é síncrona. Todas as outras chegam por Kafka ou
-por um job de expiração.
+Only the arrow into `PENDING` is synchronous. Every other one arrives through Kafka or
+from the expiry job.
+
+> `CANCELLED` is modelled and reachable in the domain, but no API route leads to it yet.
+> See "Known limits" in the README.
 
 ---
 
 ## PostgreSQL — `ticketflow_payments`
 
-| Tabela | Papel |
+| Table | Role |
 |---|---|
-| `payments` | um pagamento por pedido |
-| `payment_attempts` | uma linha por chamada ao gateway externo |
-| `processed_events` | inbox de idempotência |
-| `outbox_messages` | resultados a publicar |
+| `payments` | One payment per order |
+| `payment_attempts` | One row per call to the external gateway |
+| `payment_webhook_events` | Inbox for provider callbacks |
+| `processed_events` | Idempotency inbox |
+| `outbox_messages` | Results waiting to be published |
 
-**`payments.order_id UNIQUE`, sem foreign key.** O `UNIQUE` é a última barreira
-contra cobrar duas vezes o mesmo pedido. A ausência de FK é intencional: a tabela
-`orders` vive em outro database, e é isso que impede um `JOIN` entre serviços.
+**`payments.order_id UNIQUE`, with no foreign key.** The `UNIQUE` is the last barrier
+against charging the same order twice. The absence of an FK is deliberate: the `orders`
+table lives in another database, and that is what makes a cross-service `JOIN`
+impossible.
 
-**`payment_attempts` existe por causa dos testes.** É ela que torna os cenários do
-Wiremock verificáveis: um teste de timeout precisa provar que ficou registrada uma
-tentativa com `outcome = 'TIMEOUT'`, não só que o método lançou exceção.
+**`payment_attempts` exists because of the tests.** It is what makes the WireMock
+scenarios verifiable: a timeout test has to prove an attempt was recorded with
+`outcome = 'TIMEOUT'`, not just that a method threw.
 
-**`REJECTED` ≠ `FAILED`.** `REJECTED` é o gateway dizendo "não" (cartão sem
-limite) — resposta final, o cliente precisa ser avisado. `FAILED` é o gateway não
-tendo respondido nada de útil (timeout, 5xx) — candidato a retry. Colapsar os dois
-num status só apaga a informação de que o retry faz sentido.
+**`REJECTED` ≠ `FAILED` ≠ `ACCEPTED`.** `REJECTED` is the gateway saying no (a card
+over its limit) — a final answer, and the customer must be told. `FAILED` is the
+gateway not having said anything useful (timeout, 5xx) — a retry candidate. `ACCEPTED`
+is the provider having taken it with the answer coming later, which is the boleto case.
+Collapsing them into one status erases the information that decides what to do next.
 
-**Nada de dado de cartão no banco.** `payment_attempts.request_payload` guarda
-requisição mascarada: bandeira e últimos 4 dígitos, nunca PAN, CVV ou validade.
+**No card data in the database.** `payment_attempts.request_payload` stores a masked
+request: brand and last four digits, never the PAN, CVV or expiry date.
 
 ---
 
 ## MongoDB — `ticketflow_notifications`
 
-| Coleção | Papel |
+| Collection | Role |
 |---|---|
-| `tickets` | ingresso emitido após pagamento aprovado |
-| `notifications` | log de entrega (e-mail hoje; SMS/push depois) |
-| `processed_events` | inbox de idempotência, com TTL de 30 dias |
+| `order_snapshots` | CQRS read model built from `ORDER_CREATED` |
+| `tickets` | Ticket issued after an approved payment |
+| `notifications` | Delivery log (email today; SMS/push later) |
+| `processed_events` | Idempotency inbox, with a 30-day TTL |
 
-**`eventSnapshot` dentro do ticket.** O ingresso guarda cópia do nome, local e data
-do evento. Se o organizador mudar o nome do show depois, o ingresso já emitido
-continua legível — e a leitura não precisa de nenhum acesso ao Order Service.
-É exatamente o tipo de desnormalização que justifica um banco de documentos.
+**`eventSnapshot` inside the ticket.** The ticket keeps a copy of the event's name,
+venue and date. If the organiser renames the show later, an already issued ticket stays
+readable — and reading it needs no access to the Order Service at all. This is exactly
+the kind of denormalisation that justifies a document database.
 
-**`$jsonSchema` em todas as coleções.** "Schema-less" não significa "sem regra": o
-validador rejeita ticket sem `ticketCode` no formato certo ou com `status` fora do
-enum. Sem isso, um bug de serialização entra silenciosamente no banco.
+**`$jsonSchema` on every collection.** "Schema-less" does not mean "no rules": the
+validator rejects a ticket without a properly formatted `ticketCode`, or with a `status`
+outside the enum. Without it, a serialisation bug enters the database silently.
 
-**TTL em `processed_events`.** Depois de 30 dias uma reentrega é implausível; sem o
-TTL a coleção cresceria para sempre. As tabelas equivalentes no Postgres precisam de
-uma limpeza agendada para o mesmo fim — está anotado como dívida no README.
+**TTL on `processed_events`.** After 30 days a redelivery is implausible; without the
+TTL the collection would grow forever. The equivalent PostgreSQL tables need a scheduled
+cleanup for the same reason — recorded as a known limit in the README.
 
 ---
 
-## Estratégia de migrations
+## Migration strategy
 
-Flyway, com as migrations dentro de `src/main/resources/db/migration` de cada
-serviço — cada serviço é dono do seu schema, e em produção a migration roda junto
-com o boot da aplicação.
+Flyway, with migrations inside `src/main/resources/db/migration` of each service — every
+service owns its own schema, and in production the migration runs at application boot.
 
-O `db/seed` do Order Service fica **fora** das locations padrão. Só o
-docker-compose local adiciona esse diretório, então o catálogo de demonstração
-nunca vaza para produção. Sendo `R__` (repeatable), roda de novo sempre que muda —
-por isso todo `INSERT` lá usa `ON CONFLICT DO NOTHING`.
+The Order Service's `db/seed` sits **outside** the default locations. Only the local
+docker-compose adds that directory, so the demo catalogue can never leak into a real
+environment. Being `R__` (repeatable), it runs again whenever it changes — which is why
+every `INSERT` there is an upsert.

@@ -1,35 +1,35 @@
-# Eventos Kafka
+# Kafka events
 
-Schemas formais em [`contracts/events/`](../contracts/events/).
+Formal schemas in [`contracts/events/`](../contracts/events/).
 
-## Tópicos
+## Topics
 
-| Tópico | Partições | Retenção | Produz | Consome |
+| Topic | Partitions | Retention | Produced by | Consumed by |
 |---|---|---|---|---|
-| `ticketflow.orders.created` | 3 | 7 dias | order-service | payment-service |
-| `ticketflow.payments.processed` | 3 | 7 dias | payment-service | order-service, notification-service |
-| `ticketflow.orders.created.dlq` | 1 | 30 dias | payment-service | ninguém (inspeção manual) |
-| `ticketflow.payments.processed.dlq` | 1 | 30 dias | consumidores | ninguém (inspeção manual) |
+| `ticketflow.orders.created` | 3 | 7 days | order-service | payment-service, notification-service |
+| `ticketflow.payments.processed` | 3 | 7 days | payment-service | order-service, notification-service |
+| `ticketflow.orders.created.dlq` | 1 | 30 days | consumers | nobody (manual inspection) |
+| `ticketflow.payments.processed.dlq` | 1 | 30 days | consumers | nobody (manual inspection) |
 
-**Chave da mensagem: sempre o `orderId`.** Todos os eventos de um pedido caem na
-mesma partição e ficam ordenados entre si. Sem isso, `PAGAMENTO_APROVADO` poderia
-ser processado antes do `ORDER_CREATED` do mesmo pedido.
+**Message key: always the `orderId`.** Every event about one order lands in the same
+partition and stays ordered relative to the others. Without it, `PAGAMENTO_APROVADO`
+could be processed before the `ORDER_CREATED` of the same order.
 
-**3 partições.** Permite até 3 instâncias de um consumer group processando em
-paralelo. Aumentar partições depois é fácil; diminuir, não — então começa em 3, que
-já demonstra o paralelismo sem inflar o ambiente local.
+**3 partitions.** Allows up to 3 instances of a consumer group processing in parallel.
+Increasing partitions later is easy; decreasing is not — so it starts at 3, which is
+enough to demonstrate the parallelism without inflating the local environment.
 
-**DLQ com 1 partição e retenção longa.** Ordem não importa numa DLQ; o que importa
-é a mensagem não sumir antes de alguém olhar.
+**DLQs with 1 partition and long retention.** Ordering does not matter in a DLQ; what
+matters is that the message does not disappear before somebody looks at it.
 
-**`auto.create.topics.enable=false`.** Um erro de digitação no nome do tópico tem
-que estourar, não criar um tópico fantasma que ninguém lê. Os tópicos nascem em
+**`auto.create.topics.enable=false`.** A typo in a topic name must blow up, not create
+a ghost topic nobody reads. Topics are created by
 [`infra/kafka/create-topics.sh`](../infra/kafka/create-topics.sh).
 
 ## Envelope
 
-Toda mensagem, em todo tópico, usa o mesmo envelope — assim qualquer consumidor
-consegue deduplicar e rastrear sem entender o payload:
+Every message, on every topic, uses the same envelope — so any consumer can deduplicate
+and trace without understanding the payload:
 
 ```json
 {
@@ -44,62 +44,63 @@ consegue deduplicar e rastrear sem entender o payload:
 }
 ```
 
-| Campo | Para que serve |
+| Field | What it is for |
 |---|---|
-| `eventId` | chave de deduplicação — é o que vai para `processed_events` |
-| `eventType` | discriminador; determina o formato de `data` |
-| `eventVersion` | versão do payload; sobe em mudança quebra-contrato |
-| `occurredAt` | quando o fato aconteceu, não quando foi publicado |
-| `traceId` | trace do OpenTelemetry, propagado ponta a ponta (fase 3) |
-| `correlationId` | normalmente o `orderId`; facilita ler mensagem crua no Kafka UI |
+| `eventId` | Deduplication key — this is what goes into `processed_events` |
+| `eventType` | Discriminator; determines the shape of `data` |
+| `eventVersion` | Payload version; bumped on a contract-breaking change |
+| `occurredAt` | When the fact happened, not when it was published |
+| `traceId` | OpenTelemetry trace, propagated end to end |
+| `correlationId` | Usually the `orderId`; makes raw messages readable in the Kafka UI |
 
-Atenção a uma armadilha de nome: `envelope.eventId` é o **id da mensagem**;
-`data.eventId`, no `ORDER_CREATED`, é o **id do show**. São coisas diferentes.
+Watch out for one naming trap: `envelope.eventId` is the **message id**, while
+`data.eventId` inside `ORDER_CREATED` is the **show id**. They are different things.
 
-## Os três eventos
+## The three events
 
 ### `ORDER_CREATED`
 
-`order-service` → `ticketflow.orders.created`, gravado no outbox na mesma transação
-do pedido. Carrega tudo que o Payment Service precisa para cobrar.
+`order-service` → `ticketflow.orders.created`, written to the outbox in the same
+transaction as the order. Carries everything the Payment Service needs to charge.
 
-**Não carrega dado de cartão.** As credenciais de pagamento vão do cliente direto ao
-gateway; nunca trafegam pelo Kafka nem ficam em log.
+**It carries no card data.** Payment credentials go from the customer straight to the
+provider; they never travel through Kafka and never appear in a log.
 
 ### `PAGAMENTO_APROVADO` / `PAGAMENTO_RECUSADO`
 
-`payment-service` → `ticketflow.payments.processed`, depois da resposta do gateway.
+`payment-service` → `ticketflow.payments.processed`, after the gateway responds.
 
-Os dois compartilham um único tópico. Separá-los em dois tópicos perderia a garantia
-de ordem entre eles, e quem se interessa por um quase sempre se interessa pelo
-outro — o `eventType` já distingue.
+Both share a single topic. Splitting them into two topics would lose the ordering
+guarantee between them, and whoever cares about one almost always cares about the
+other — `eventType` already tells them apart.
 
-`PAGAMENTO_APROVADO` obriga `gatewayTransactionId`; `PAGAMENTO_RECUSADO` obriga
-`failureCode`. Isso está no JSON Schema, não só na convenção.
+`PAGAMENTO_APROVADO` requires `gatewayTransactionId`; `PAGAMENTO_RECUSADO` requires
+`failureCode`. That lives in the JSON Schema, not only in convention.
 
-> Estes dois nomes estão em português por serem vocabulário fixo do projeto. Todo o
-> resto do código é em inglês. É a única exceção, e é deliberada.
+> These two names are in Portuguese because they are fixed project vocabulary. All the
+> rest of the code is in English. It is the only exception, and it is deliberate.
 
-## Retry e DLQ
+## Retry and DLQ
 
-Regra em qualquer consumidor:
+The rule in any consumer:
 
-1. **Erro transitório** (gateway fora, banco indisponível) → retry com backoff
-   exponencial.
-2. **Erro permanente** (payload inválido, evento para pedido inexistente) → DLQ
-   direto. Retentar não vai consertar.
-3. **Estouro das tentativas** → DLQ, com o erro nos headers.
+1. **Transient error** (gateway down, database unavailable) → retry with exponential
+   backoff.
+2. **Permanent error** (invalid payload, event for an order that does not exist) →
+   straight to the DLQ. Retrying will not fix it.
+3. **Attempts exhausted** → DLQ, with the error in the headers.
 
-Nunca engolir a exceção e commitar o offset: a mensagem some sem ninguém saber.
+Never swallow the exception and commit the offset: the message vanishes and nobody
+knows.
 
-## Compatibilidade de schema
+## Schema compatibility
 
-Regra ao evoluir um payload:
+The rule when evolving a payload:
 
-- Campo novo **opcional** → compatível, não sobe `eventVersion`.
-- Campo obrigatório novo, campo removido ou tipo alterado → **quebra**. Sobe
-  `eventVersion`, e o consumidor lê as duas versões até o produtor parar de emitir
-  a antiga.
+- A new **optional** field → compatible, does not bump `eventVersion`.
+- A new required field, a removed field, or a changed type → **breaking**. Bump
+  `eventVersion`, and the consumer reads both versions until the producer stops
+  emitting the old one.
 
-Nunca reaproveitar um nome de campo com outro significado — é o tipo de mudança que
-passa em todos os testes e quebra em produção.
+Never reuse a field name with a different meaning — that is the kind of change that
+passes every test and breaks in production.

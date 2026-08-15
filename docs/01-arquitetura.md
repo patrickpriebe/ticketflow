@@ -1,20 +1,21 @@
-# Arquitetura
+# Architecture
 
-## O problema que o desenho resolve
+## The problem this design solves
 
-Vender ingresso tem um pico brutal: quando abre a venda de um show grande, milhares
-de pessoas apertam "comprar" no mesmo minuto. Se a API de pedido ficar esperando o
-gateway de pagamento responder, cada requisição segura uma thread por segundos e o
-sistema cai justamente na hora que importa.
+Selling tickets has a brutal peak: when a big show opens, thousands of people press
+"buy" in the same minute. If the order API sits waiting for the payment gateway to
+answer, every request holds a thread for seconds and the system falls over exactly
+when it matters.
 
-O TicketFlow parte de outra premissa: **o Order Service nunca espera o pagamento**.
-Ele grava o pedido como `PENDING`, publica um evento e responde `202 Accepted` em
-milissegundos. O pagamento acontece depois, em outro processo, no ritmo dele.
+TicketFlow starts from a different premise: **the Order Service never waits for the
+payment.** It stores the order as `PENDING`, publishes an event and answers
+`202 Accepted` in milliseconds. The payment happens later, in another process, at its
+own pace.
 
-Essa é a decisão central do projeto. Se em algum momento aparecer uma chamada HTTP
-síncrona entre os três serviços, a premissa quebrou.
+That is the central decision of the project. If a synchronous HTTP call ever appears
+between the three services, the premise is broken.
 
-## Os três serviços
+## The three services
 
 ```
                     ┌──────────────────────┐
@@ -34,8 +35,8 @@ síncrona entre os três serviços, a premissa quebrou.
                                │                                    │ HTTP
                                │                                    ▼
                                │                         ┌──────────────────────┐
-                               │                         │  Gateway externo     │
-                               │                         │  (Wiremock em teste) │
+                               │                         │  External gateway    │
+                               │                         │  (Stripe · WireMock) │
                                │                         └──────────────────────┘
                                │
                                │   ticketflow.payments.processed
@@ -51,75 +52,77 @@ síncrona entre os três serviços, a premissa quebrou.
                                                          └──────────────────────┘
 ```
 
-### Order Service — API REST
+### Order Service — REST API
 
-Dono do catálogo e dos pedidos. Faz duas coisas:
+Owns the catalogue and the orders. It does two things:
 
-- **Produz** `ORDER_CREATED` quando um pedido entra.
-- **Consome** `PAGAMENTO_APROVADO` / `PAGAMENTO_RECUSADO` para mover o pedido de
-  `PENDING` para `PAID` ou `REJECTED`.
+- **Produces** `ORDER_CREATED` when an order comes in.
+- **Consumes** `PAGAMENTO_APROVADO` / `PAGAMENTO_RECUSADO` to move the order from
+  `PENDING` to `PAID` or `REJECTED`.
 
-Consumir o próprio resultado é o que permite o `GET /orders/{id}` mostrar o status
-final sem nunca ter perguntado nada ao Payment Service.
+Consuming its own result is what lets `GET /orders/{id}` show the final status without
+ever having asked the Payment Service anything.
 
 ### Payment Service — worker
 
-Não tem API pública. Consome `ORDER_CREATED`, chama o gateway externo por HTTP e
-publica o resultado. É o único serviço que fala com o mundo lá fora, e é por isso
-que ele é o alvo dos testes de integração com Wiremock (sucesso, recusa, timeout,
-5xx — não só o caminho feliz).
+It has one public route (the provider's webhook) and one authenticated read used by
+the browser to confirm a card. Everything else it does is driven by Kafka: it consumes
+`ORDER_CREATED`, calls the external gateway over HTTP and publishes the result. It is
+the only service that talks to the outside world, which is why it is the target of the
+WireMock integration tests — success, decline, timeout and 5xx, not just the happy path.
 
 ### Notification Service
 
-Consome `PAGAMENTO_APROVADO` e emite o ingresso; consome `PAGAMENTO_RECUSADO` e
-registra o aviso de falha. Grava tudo no MongoDB.
+Consumes `ORDER_CREATED` to build its read model, consumes `PAGAMENTO_APROVADO` to
+issue the ticket, and consumes `PAGAMENTO_RECUSADO` to record the failure notice.
+Everything is stored in MongoDB.
 
-## Por que Kafka e não uma fila comum
+## Why Kafka and not a plain queue
 
-Dois consumidores diferentes precisam do mesmo evento de pagamento (Order Service
-para atualizar o status, Notification Service para emitir o ingresso), cada um no
-seu ritmo e sem saber da existência do outro. Com consumer groups distintos os dois
-leem o mesmo tópico independentemente — acrescentar um quarto serviço amanhã não
-exige tocar em quem publica.
+Two different consumers need the same payment event — the Order Service to update the
+status, the Notification Service to issue the ticket — each at its own pace and neither
+aware of the other. With separate consumer groups they read the same topic
+independently, and adding a fourth service tomorrow requires touching nobody who
+publishes.
 
-A chave da mensagem é sempre o `orderId`. Isso mantém todos os eventos de um mesmo
-pedido na mesma partição e, portanto, estritamente ordenados: o `PAGAMENTO_APROVADO`
-jamais chega antes do `ORDER_CREATED` daquele pedido.
+The message key is always the `orderId`. That keeps every event about one order in the
+same partition and therefore strictly ordered: `PAGAMENTO_APROVADO` can never arrive
+before the `ORDER_CREATED` of that order.
 
-## Entrega pelo menos uma vez, e o que isso obriga
+## At-least-once delivery, and what it forces
 
-Kafka entrega *at-least-once*. Uma mensagem pode chegar duas vezes (rebalance,
-falha antes do commit do offset). Duas defesas em todo consumidor:
+Kafka delivers *at-least-once*. A message can arrive twice (a rebalance, a failure
+before the offset commit). Two defences in every consumer:
 
-1. **Tabela/coleção `processed_events`** — guarda o `eventId` já processado por
-   consumer group. Evento repetido é descartado.
-2. **Restrições no banco** — `payments.order_id` é `UNIQUE`, `tickets.ticketCode`
-   é único. Se a lógica falhar, o banco não deixa cobrar duas vezes.
+1. **A `processed_events` table/collection** — stores the `eventId` already handled per
+   consumer group. A repeated event is discarded.
+2. **Database constraints** — `payments.order_id` is `UNIQUE`, `tickets.ticketCode` is
+   unique. If the logic fails, the database still refuses to charge twice.
 
-## Outbox transacional
+## Transactional outbox
 
-Salvar o pedido no Postgres e publicar no Kafka são duas operações em sistemas
-diferentes. Se a segunda falhar, o pedido existe e ninguém nunca vai cobrá-lo.
+Saving the order in PostgreSQL and publishing to Kafka are two operations in different
+systems. If the second fails, the order exists and nobody will ever charge it.
 
-A solução aqui é a tabela `outbox_messages`: o `INSERT` do pedido e o `INSERT` do
-evento acontecem na **mesma transação**. Um relay lê as linhas `PENDING` e publica
-no Kafka depois. Ou os dois existem, ou nenhum dos dois.
+The solution here is the `outbox_messages` table: the order `INSERT` and the event
+`INSERT` happen in the **same transaction**. A relay reads the `PENDING` rows and
+publishes to Kafka afterwards. Either both exist, or neither does.
 
-O preço é que a publicação fica assíncrona e pode duplicar (o relay publica, cai
-antes de marcar `PUBLISHED`, republica) — o que está tudo bem, porque os
-consumidores já são idempotentes pelo item anterior.
+The price is that publishing becomes asynchronous and may duplicate — the relay
+publishes, dies before marking `PUBLISHED`, and republishes. That is fine, because the
+consumers are already idempotent by the previous section.
 
-## Dois bancos, de propósito
+## Two databases, on purpose
 
 | | PostgreSQL | MongoDB |
 |---|---|---|
-| Serviços | Order, Payment | Notification |
-| Guarda | pedidos, pagamentos, catálogo | ingressos, histórico de notificação |
-| Por quê | dado transacional, relacional, com invariantes que precisam de constraint e transação | documento variável — cada canal (e-mail, SMS, push) tem um formato, e o ingresso carrega um *snapshot* do evento |
+| Services | Order, Payment | Notification |
+| Stores | orders, payments, catalogue | tickets, notification history |
+| Why | transactional, relational data with invariants that need constraints and transactions | variable documents — each channel (email, SMS, push) has its own shape, and a ticket carries a *snapshot* of the event |
 
-Order Service e Payment Service compartilham o *container* de Postgres por
-conveniência local, mas cada um tem seu **database próprio**. Nenhum enxerga a
-tabela do outro — é isso que força a conversa a passar pelo Kafka.
+The Order and Payment services share the PostgreSQL container out of local convenience,
+but each has its **own database**. Neither can see the other's tables — that is what
+forces the conversation through Kafka.
 
-Regra prática: entidade nova claramente transacional vai para o Postgres, mesmo
-que haja código Mongo por perto.
+Rule of thumb: a new entity that is clearly transactional goes to PostgreSQL, even if
+there happens to be Mongo code nearby.

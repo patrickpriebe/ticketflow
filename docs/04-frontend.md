@@ -1,134 +1,133 @@
 # Frontend
 
-O front do TicketFlow existe por um motivo específico: um sistema distribuído
-só demonstra o que sabe fazer quando alguém consegue *ver* a resposta imediata,
-o pedido mudando de status sozinho e o ingresso aparecendo. Sem tela, tudo isso
-vira captura de terminal.
+The TicketFlow frontend exists for one specific reason: a distributed system only
+demonstrates what it can do when somebody can *see* the immediate response, the order
+changing status on its own, and the ticket appearing. Without a screen, all of that is
+just terminal output.
 
-Ele consome duas APIs — Order Service e Notification Service — e não fala com o
-Payment Service. Isso não é limitação: o Payment não tem API pública, ele reage
-a eventos.
+It consumes three APIs — Order, Notification and one authenticated read on Payment.
+That last one exists only so Stripe Elements can confirm a card; everything else the
+Payment Service does is driven by events.
 
 ## Stack
 
-| Peça | Escolha | Por quê |
+| Piece | Choice | Why |
 |---|---|---|
-| Build | Vite | Servidor de desenvolvimento rápido e proxy embutido |
-| UI | React 18 + TypeScript estrito | Tipos espelham o contrato OpenAPI |
-| Estilo | CSS com custom properties | Tema claro/escuro sai de graça; zero runtime |
-| Rotas | Roteador próprio (~60 linhas) | Ver [Decisões](#decisões) |
-| Estado | `useState` + `sessionStorage` | Não há estado global suficiente para justificar biblioteca |
+| Build | Vite | Fast dev server and a built-in proxy |
+| UI | React 18 + strict TypeScript | Types mirror the OpenAPI contract |
+| Styling | CSS custom properties | Light/dark comes for free; zero runtime |
+| Routing | Own router (~60 lines) | See [Decisions](#decisions) |
+| State | `useState` + `sessionStorage` | There is not enough global state to justify a library |
 
-Nenhuma dependência além de `react` e `react-dom`.
+No dependency beyond `react` and `react-dom`.
 
-## Telas
+## Screens
 
 ```
-/                    Home: hero de busca, destaques, próximos eventos
-/events              Descobrir: filtros de cidade, preço e texto
-/events/:id          Evento: sobre, local e seletor de ingressos
-/checkout            Pagamento: escolha do método e resumo
-/orders              Meus pedidos, com filtro de status
-/orders/:id          Pedido: canhoto, prazo, ingressos e linha do tempo
-/signin              Identificação
+/                    Home: search hero, highlights, upcoming events
+/events              Discover: filters by city, price and text
+/events/:id          Event: description, venue and ticket selector
+/checkout            Payment: method and summary
+/orders              My orders, filtered by status
+/orders/:id          Order: stub, deadline, tickets and timeline
+/signin              Sign in
 ```
 
-### Entrar
+### Sign in
 
-A tela tem duas colunas: um painel escuro com a arte do hero, que responde "o que
-acontece depois que eu entrar", e o cartão com o mecanismo de entrada.
+The screen has two columns: a dark panel carrying the hero artwork, which answers "what
+happens after I sign in", and the card with the sign-in mechanism.
 
-O mecanismo depende de haver provedor configurado, e é a única diferença entre os
-dois ambientes:
+The mechanism depends on whether a provider is configured, and it is the only difference
+between the two environments:
 
-- **`VITE_GOOGLE_CLIENT_ID` definido** — botão do Google. O provedor devolve um ID
-  token assinado direto para o navegador, que o manda no `Authorization`. Sem troca
-  de código, sem sessão e sem cookie: os serviços continuam sendo resource servers
-  puros. O token vale uma hora e não há refresh — passada a hora, a API responde
-  401, o front derruba a sessão e a pessoa entra de novo.
-- **Sem client id** — formulário de desenvolvimento, que fala com um emissor local
-  que não verifica nada. É o que permite rodar o projeto inteiro sem ter conta em
-  provedor nenhum. Esse emissor está desligado em qualquer ambiente publicado.
+- **`VITE_GOOGLE_CLIENT_ID` set** — the Google button. The provider returns a signed ID
+  token straight to the browser, which sends it in `Authorization`. No code exchange, no
+  session and no cookie: the services stay pure resource servers. The token lasts an
+  hour and there is no refresh token — after that the API answers 401, the frontend
+  drops the session and the person signs in again.
+- **No client id** — the development form, which talks to a local issuer that verifies
+  nothing. It is what allows the whole project to run without an account at any
+  provider. That issuer is turned off in every published environment.
 
-O front lê os claims do token para escrever o nome na tela, **e só para isso**.
-Qualquer pessoa monta um JWT com o nome que quiser; a parte que não dá para forjar
-é a assinatura, e conferir assinatura é trabalho de quem guarda os dados.
+The frontend reads the token's claims to write the name on screen, **and only for that**.
+Anyone can build a JWT with any name in it; the part that cannot be forged is the
+signature, and checking signatures is the job of whoever holds the data.
 
 ## Design system
 
-Tudo sai de `src/styles/tokens.css`. **Nenhum componente escreve um
-hexadecimal** — se escrever, o tema escuro não alcança aquele pedaço da tela, e
-é sempre assim que um dark mode fica pela metade.
+Everything comes from `src/styles/tokens.css`. **No component writes a hex value** — if
+one does, the dark theme never reaches that part of the screen, and that is always how a
+dark mode ends up half-finished.
 
-- **Primária `#0052ff`** — ações, links e estados ativos
-- **Tinta `#121212`** — texto e superfícies invertidas
-- **Destaque `#bf3003`** — urgência, esgotado, recusa. Usado com parcimônia: se
-  aparece em tudo, deixa de significar alguma coisa
-- **Neutra `#f8f9fa`** — fundo de seção
-- **Inter**, com a pilha do sistema como reserva
+- **Primary `#0052ff`** — actions, links and active states
+- **Ink `#121212`** — text and inverted surfaces
+- **Accent `#bf3003`** — urgency, sold out, decline. Used sparingly: if it shows up
+  everywhere it stops meaning anything
+- **Neutral `#f8f9fa`** — section background
+- **Inter**, with the system stack as a fallback
 
-O tema tem **três estados**: claro, escuro e "seguir o sistema". Sem o terceiro,
-quem escolheu uma vez fica preso — e a maioria das pessoas nunca volta ao botão
-para corrigir. O padrão é o terceiro, e nesse caso o atributo `data-theme` nem
-existe no DOM: quem decide é o `prefers-color-scheme`.
+The theme has **three states**: light, dark, and "follow the system". Without the third,
+whoever chose once is stuck — and most people never go back to the button to fix it. The
+default is the third, and in that case the `data-theme` attribute is not in the DOM at
+all: `prefers-color-scheme` decides.
 
-No escuro a paleta não é a clara invertida. O azul de marca puro sobre fundo
-quase preto fica abaixo do contraste mínimo, então clareia para `#4d84ff`. E o
-fundo não é preto puro, porque sombra nenhuma aparece sobre `#000` e a
-hierarquia de profundidade some junto.
+In dark mode the palette is not the light one inverted. Pure brand blue on a near-black
+background falls below the minimum contrast, so it lightens to `#4d84ff`. And the
+background is not pure black, because no shadow is visible over `#000` and the depth
+hierarchy disappears with it.
 
-## Decisões
+## Decisions
 
-**Roteador próprio em vez de React Router.** Não é economia de dependência: é
-que um front deste tamanho usa uma fração da biblioteca, e a parte que usa cabe
-em cinquenta linhas legíveis sobre a History API. O que não cabe — rotas
-aninhadas, carregamento por rota, guardas — também não é necessário aqui. O
-inegociável era existir URL de verdade: botão voltar funcionando, pedido aberto
-por link direto e recarregar sem cair na home.
+**Own router instead of React Router.** It is not about saving a dependency: a frontend
+this size uses a fraction of the library, and the fraction it uses fits in fifty
+readable lines over the History API. What does not fit — nested routes, per-route code
+splitting, guards — is not needed here either. The non-negotiable part was having real
+URLs: a working back button, an order openable by direct link, and a reload that does
+not land on the home page.
 
-**Carrinho no cliente, não no servidor.** Nada é reservado enquanto a pessoa
-escolhe. A reserva acontece no `POST /orders`, numa transação só. Um carrinho no
-servidor teria de segurar assento por tempo indeterminado para todo mundo que
-abriu a página — é o tipo de coisa que parece cuidado e vira estoque preso.
-Fica em `sessionStorage` para sobreviver a um F5 no meio do checkout.
+**The cart lives in the client, not the server.** Nothing is reserved while the person
+is choosing. The reservation happens in `POST /orders`, in a single transaction. A
+server-side cart would have to hold seats for an indefinite time for everyone who opened
+the page — the kind of thing that looks like care and turns into stuck inventory. It
+lives in `sessionStorage` so it survives a refresh mid-checkout.
 
-**Pôster desenhado, não fotografado.** O catálogo não tem imagem, e criar um
-campo `imageUrl` no contrato só para o front ficar bonito seria o rabo abanando
-o cachorro: sem lugar para hospedar e sem fluxo de upload, o campo nasceria
-vazio. Cada evento ganha um SVG derivado do próprio id — mesma cara sempre,
-grade variada, zero bytes de rede.
+**Posters are drawn, not photographed.** The catalogue has no images, and adding an
+`imageUrl` field to the contract just so the frontend could look better would be the
+tail wagging the dog: with nowhere to host and no upload flow, the field would be born
+empty. Each event gets an SVG derived from its own id — always the same face, a varied
+grid, zero bytes over the network.
 
-**Sem coleta de dados de cartão.** A tela de pagamento explica o que cada método
-faz e não pede número nem CVV. Não é simplificação: o Payment Service conversa
-com um gateway simulado, e mesmo em produção o sistema guardaria só bandeira e
-últimos quatro dígitos. Um formulário de cartão que não vai a lugar nenhum seria
-teatro — e teatro convincente demais para o gosto.
+**Card data is collected by Stripe, not by us.** The card field is an iframe belonging to
+Stripe; the number goes straight to them. Our code only ever touches the `client_secret`,
+which authorises that one charge and nothing else. The system stores only the brand and
+the last four digits.
 
-**Filtro de cidade no backend, preço e texto no cliente.** Cidade é parâmetro
-real do catálogo. Preço e texto são filtrados sobre a página carregada, porque o
-endpoint não tem esses parâmetros. Com o catálogo atual cabe tudo numa página;
-quando não couber, filtrar no cliente passa a mentir — e a resposta certa é
-levar os dois para o backend, não paginar melhor no front.
+**City filtering on the backend, price and text on the client.** City is a real catalogue
+parameter. Price and text are filtered over the loaded page, because the endpoint has no
+such parameters. With the current catalogue everything fits in one page; when it stops
+fitting, client-side filtering starts lying — and the right answer then is to move both
+to the backend, not to paginate more cleverly in the frontend.
 
-**Polling, não WebSocket.** É o que o contrato define: o `POST` responde `202` e
-o cliente consulta `GET /orders/{id}`. O intervalo para sozinho quando o pedido
-chega a um estado final.
+**Polling, not WebSocket.** It is what the contract defines: `POST` answers `202` and the
+client polls `GET /orders/{id}`. The interval stops on its own once the order reaches a
+final state.
 
-## Rodando
+## Running
 
 ```bash
 npm install --prefix frontend
 npm run dev --prefix frontend
 ```
 
-O Vite faz proxy de `/api/v1/tickets` para o Notification Service (8083) e do
-resto de `/api` para o Order Service (8081). A ordem das regras importa: a mais
-específica primeiro, senão `/api` engole tudo.
+Vite proxies `/api/v1/tickets` to the Notification Service (8083), `/api/v1/payments` to
+the Payment Service (8082), and the rest of `/api` to the Order Service (8081). Rule
+order matters: the most specific first, otherwise `/api` swallows everything.
 
-Proxy em vez de CORS no backend porque, em produção, o front seria servido pelo
-mesmo domínio — e abrir CORS só para o ambiente de desenvolvimento é uma
-configuração que costuma vazar para produção por esquecimento.
+A proxy instead of CORS on the backend because, in production, the frontend is served
+from the same origin — and opening CORS only for the development environment is the kind
+of configuration that leaks into production by being forgotten.
 
-## O que vem depois
+## What comes next
 
-Ver [05-roadmap-produto.md](05-roadmap-produto.md).
+See [05-roadmap-produto.md](05-roadmap-produto.md).

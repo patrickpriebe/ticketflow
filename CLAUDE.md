@@ -31,8 +31,8 @@ credential through a Kafka topic into another service's database.
 - **Code comments and Javadoc: Portuguese.** Some older backend code is in English;
   do not translate it just to be consistent, but write new comments in Portuguese —
   that is what the codebase reads like today.
-- **`README.md`: English.** It is the front door of a public portfolio.
-- **`docs/`: Portuguese.**
+- **Markdown documentation (`README.md`, `docs/`): English.** This is a public
+  portfolio and the audience reads English.
 - **Single exception:** the event types `PAGAMENTO_APROVADO` and `PAGAMENTO_RECUSADO`
   are fixed project vocabulary and stay in Portuguese. Do not create synonyms or
   translate them.

@@ -684,5 +684,7 @@ Product roadmap and what is deliberately out of scope:
 - [Product roadmap](docs/05-roadmap-produto.md) — what does not exist yet, and what stays out
 - [API contract](contracts/openapi/order-service.yaml) — OpenAPI 3.0
 
-> Documentation under `docs/` is written in Portuguese; code, identifiers, table names,
-> routes and JSON fields are in English.
+> Documentation and identifiers are in English. Code comments are in Portuguese, which
+> is how the codebase reads today — with the single deliberate exception of the event
+> types `PAGAMENTO_APROVADO` and `PAGAMENTO_RECUSADO`, fixed project vocabulary that is
+> never translated.
