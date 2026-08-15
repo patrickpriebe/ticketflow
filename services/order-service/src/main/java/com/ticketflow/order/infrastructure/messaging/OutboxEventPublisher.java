@@ -3,6 +3,7 @@ package com.ticketflow.order.infrastructure.messaging;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow.order.application.port.out.DomainEventPublisher;
+import com.ticketflow.order.domain.event.OrderCancelled;
 import com.ticketflow.order.domain.event.OrderCreated;
 import com.ticketflow.order.domain.model.Order;
 import com.ticketflow.order.infrastructure.persistence.entity.OutboxMessageEntity;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class OutboxEventPublisher implements DomainEventPublisher {
 
     static final String TOPIC_ORDERS_CREATED = "ticketflow.orders.created";
+    static final String TOPIC_ORDERS_CANCELLED = "ticketflow.orders.cancelled";
     private static final String AGGREGATE_TYPE = "Order";
     private static final String PRODUCER = "order-service";
     private static final int EVENT_VERSION = 1;
@@ -60,6 +62,51 @@ public class OutboxEventPublisher implements DomainEventPublisher {
                 Instant.now());
 
         outbox.save(message);
+    }
+
+    @Override
+    public void publish(OrderCancelled event) {
+        Order order = event.order();
+
+        OutboxMessageEntity message = new OutboxMessageEntity(
+                UUID.randomUUID(),
+                AGGREGATE_TYPE,
+                order.id(),
+                OrderCancelled.TYPE,
+                TOPIC_ORDERS_CANCELLED,
+                // Mesma chave do ORDER_CREATED daquele pedido. Não é para ordenar
+                // entre tópicos — isso o Kafka não garante —, é para o Payment
+                // Service continuar lendo tudo de um pedido na mesma partição.
+                order.id().toString(),
+                writeJson(cancelledEnvelope(event)),
+                writeJson(Map.of("contentType", "application/json", "eventType", OrderCancelled.TYPE)),
+                Instant.now());
+
+        outbox.save(message);
+    }
+
+    private Map<String, Object> cancelledEnvelope(OrderCancelled event) {
+        Order order = event.order();
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("orderId", order.id().toString());
+        data.put("customerId", order.customer().id().toString());
+        data.put("reason", event.reason());
+        // O valor vai junto porque quem estorna precisa saber quanto devolver sem
+        // perguntar a ninguém. Consultar o Order Service para descobrir seria a
+        // chamada síncrona entre serviços que este projeto não admite.
+        data.put("totalAmount", order.totalAmount().amount());
+        data.put("currency", order.totalAmount().currency());
+
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("eventId", event.eventId().toString());
+        envelope.put("eventType", OrderCancelled.TYPE);
+        envelope.put("eventVersion", EVENT_VERSION);
+        envelope.put("occurredAt", event.occurredAt().toString());
+        envelope.put("producer", PRODUCER);
+        envelope.put("correlationId", order.id().toString());
+        envelope.put("data", data);
+        return envelope;
     }
 
     private Map<String, Object> envelopeOf(OrderCreated event) {

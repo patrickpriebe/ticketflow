@@ -227,6 +227,47 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/orders/{orderId}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an order that has not been paid yet
+      description: |
+        `POST` and not `DELETE`: the order does not stop existing, it changes
+        state, and that change is part of what the screen shows.
+
+        The cancellation **does not wait for the payment**. Asking the Payment
+        Service whether the card was already charged would be the synchronous
+        service-to-service call this architecture forbids, and it would hold the
+        customer on a spinner because of a slow provider. The order is cancelled
+        immediately and an `ORDER_CANCELLED` event goes out; whoever holds the
+        money decides whether to give it back.
+
+        The accepted consequence: for a moment there can be a cancelled order
+        whose card was charged. That is a real state in a distributed system, and
+        the answer to it is a refund - not a lock that pretends the race does not
+        exist.
+
+        Cancelling an order that is already paid, cancelled or expired returns
+        **409**. A paid order is not cancelled, it is refunded, and that is a
+        different flow with different rules. Someone else's order returns **404**,
+        exactly like an order that does not exist.
+      operationId: cancelOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: The order, already cancelled. Returned so the screen does not have to ask again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
 components:
 
   securitySchemes:
@@ -262,6 +303,13 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     NotFound:
       description: Resource not found.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: |
+        The request is valid but the resource is no longer in a state that allows
+        it - typically an order that has already reached a terminal status.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }

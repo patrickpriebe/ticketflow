@@ -389,6 +389,47 @@ different people, and without it that eventually becomes a merged account.
 All three sides have a test with the same pinned vector, so divergence breaks the
 build instead of losing tickets in production.
 
+### An idempotency key belongs to whoever sent it
+
+`Idempotency-Key` was unique across the whole `orders` table, and `POST /orders`
+replays the order that owns the key. Those two facts together meant that sending
+`Idempotency-Key: order-1` — a value two people pick without coordinating — answered
+`200` with the *other customer's* order: their name, their e-mail, what they bought,
+what they paid. No token of theirs, no probing of ids, nothing in the logs that looks
+like an attack.
+
+The key is now scoped to the customer, in the lookup and in the unique constraint
+alike. Two people using `order-1` stopped being a conflict, and a key can only ever
+replay an order of whoever sent it.
+
+The lesson generalises past this bug: **any value the client chooses is an input, and
+looking something up by it without scoping it to the caller is an authorisation
+decision made by accident.**
+
+### Metrics are not public
+
+`/actuator/prometheus` was open on every service. Locally that is fine — the Prometheus
+in the compose file scrapes it. On Render the services answer directly on the internet
+and nothing scrapes them, so the same route handed anyone the order volume, the amount
+approved and declined, every API route and the exact JVM version.
+
+It is now behind `ticketflow.observability.public-metrics`, which defaults to **false**
+and is turned on only where a scraper exists — the compose file and the Kubernetes
+ConfigMap. Health probes stay open, because Render and Kubernetes call them before any
+token exists.
+
+### The browser gets security headers
+
+The site ships a **Content-Security-Policy** that names the only origins it needs
+(Stripe, Google Identity, Google Fonts), plus `frame-ancestors 'none'`, `nosniff`,
+HSTS and a `Referrer-Policy`. The session token lives in `localStorage`, which is a
+deliberate trade-off for a SPA — and the CSP is what keeps that trade-off cheap, since
+an injected script is the way a `localStorage` token gets stolen.
+
+The theme script moved out of `index.html` to make this possible: a `script-src` that
+allows inline code allows injected code too, and pinning the snippet's hash instead
+breaks silently every time the snippet is edited.
+
 ### Secrets
 
 Two layers, both tested in both directions:
@@ -659,11 +700,16 @@ Recorded so they do not look like oversights.
 - **Card payments require the browser.** PIX and boleto settle through the webhook;
   card needs Stripe Elements, which is implemented, but there is no server-side
   fallback for a customer who closes the page mid-confirmation.
-- **There is no order cancellation.** The domain has `Order.cancel(...)` and `CANCELLED`
-  is a legitimate terminal state, but nothing reaches it — orders only leave `PENDING`
-  through payment, decline, or the expiry job. Implementing it properly means handling
-  the race where a cancellation and an approval cross, which is a compensation problem
-  (refund), not a locking one.
+- **Cancellation does not refund yet.** `POST /orders/{id}/cancel` exists, releases the
+  reserved tickets and publishes `ORDER_CANCELLED`, and the Order Service already
+  absorbs an approval that arrives for a closed order instead of dying on an illegal
+  transition. What is missing is the other half: the Payment Service consuming that
+  event to refund a card that was already charged. Until then the compensation is
+  triggered but never carried out.
+- **Nothing is rate limited.** An authenticated customer can place orders in a loop and
+  hold real inventory for the length of the payment window. The expiry sweep bounds the
+  damage rather than preventing it, and the fix belongs at the edge (Render, or a
+  gateway), not in a `for` loop inside the use case.
 - **`processed_events` grows without bound in PostgreSQL.** The MongoDB one already has
   a 30-day TTL; the relational ones need a scheduled cleanup.
 - **The catalogue has no administrative path.** Events are seeded locally and were

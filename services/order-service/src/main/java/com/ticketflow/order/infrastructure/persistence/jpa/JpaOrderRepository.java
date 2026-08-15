@@ -22,8 +22,11 @@ public interface JpaOrderRepository extends JpaRepository<OrderEntity, UUID> {
     @EntityGraph(attributePaths = "items")
     Optional<OrderEntity> findWithDetailsById(UUID id);
 
+    // O customerId vem primeiro porque é ele que dá sentido à chave: o índice
+    // único é (customer_id, idempotency_key), e procurar só pela chave devolvia o
+    // pedido de outro cliente para quem repetisse um valor comum.
     @EntityGraph(attributePaths = "items")
-    Optional<OrderEntity> findByIdempotencyKey(String idempotencyKey);
+    Optional<OrderEntity> findByCustomerIdAndIdempotencyKey(UUID customerId, String idempotencyKey);
 
     @EntityGraph(attributePaths = "items")
     Page<OrderEntity> findByCustomerId(UUID customerId, Pageable pageable);

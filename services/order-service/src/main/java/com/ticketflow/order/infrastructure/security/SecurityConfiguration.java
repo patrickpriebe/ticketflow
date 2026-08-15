@@ -34,7 +34,21 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            @Value("${ticketflow.auth.dev-tokens:false}") boolean devTokens) throws Exception {
+            @Value("${ticketflow.auth.dev-tokens:false}") boolean devTokens,
+            @Value("${ticketflow.observability.public-metrics:false}") boolean publicMetrics) throws Exception {
+
+        if (publicMetrics) {
+            // Liberado só onde existe raspador: o Prometheus do compose e o do
+            // cluster. Aberto por toda parte, `/actuator/prometheus` entrega de
+            // graça a quem passar o volume de pedidos, quanto foi aprovado e
+            // recusado, cada rota da API e a versão exata da JVM — um mapa do
+            // sistema para quem estiver escolhendo por onde começar.
+            //
+            // O padrão é fechado pelo mesmo motivo que `dev-tokens` é: uma
+            // variável esquecida tem que falhar para o lado seguro. Nada raspa
+            // estes serviços no Render, então lá não se perde nada fechando.
+            http.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/prometheus").permitAll());
+        }
 
         if (devTokens) {
             // O emissor de desenvolvimento precisa ser alcançável sem token - senão
@@ -50,10 +64,10 @@ public class SecurityConfiguration {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Probes e métricas ficam abertas: o Kubernetes consulta as
-                        // primeiras antes de existir qualquer token, e o Prometheus
-                        // raspa a última de dentro da rede.
-                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        // As probes ficam abertas: o Kubernetes e o Render as
+                        // consultam antes de existir qualquer token. As métricas
+                        // não — elas dependem da liberação acima.
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // O catálogo é público de propósito - é uma vitrine, e exigir
                         // login para ver o que está à venda afastaria comprador.
                         .requestMatchers(HttpMethod.GET, "/api/v1/events", "/api/v1/events/*").permitAll()

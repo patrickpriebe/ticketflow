@@ -40,4 +40,17 @@ public enum OrderStatus {
     public boolean isTerminal() {
         return this != PENDING;
     }
+
+    /**
+     * Acabou sem ninguém ter pago: o cliente desistiu ou o prazo venceu.
+     *
+     * <p>Não é o mesmo que {@link #isTerminal()}, e a diferença é dinheiro. Uma
+     * aprovação que chega para um pedido <strong>cancelado ou expirado</strong> é
+     * cobrança sem pedido, e pede estorno. Uma aprovação que chega para um pedido
+     * já {@link #PAID} é outra coisa — inconsistência de quem publicou —, e tratar
+     * as duas igual mandaria estornar uma compra legítima.
+     */
+    public boolean isClosedWithoutPayment() {
+        return this == CANCELLED || this == EXPIRED;
+    }
 }

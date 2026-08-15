@@ -10,6 +10,10 @@ metadata:
   namespace: ticketflow
 data:
   SPRING_PROFILES_ACTIVE: "kubernetes"
+  # Dentro do cluster quem alcança a porta do pod é o Prometheus, então a rota de
+  # métricas fica aberta aqui. O padrão é fechado, e é o que vale no Render, onde
+  # o serviço responde direto na internet e ninguém raspa nada.
+  TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS: "true"
   KAFKA_BOOTSTRAP: "kafka:9092"
   SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
   POSTGRES_HOST: "postgres"

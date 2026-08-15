@@ -2,6 +2,7 @@ package com.ticketflow.order.infrastructure.web;
 
 import com.ticketflow.order.application.pagination.PageQuery;
 import com.ticketflow.order.application.pagination.PageResult;
+import com.ticketflow.order.application.port.in.CancelOrderUseCase;
 import com.ticketflow.order.application.port.in.CreateOrderUseCase;
 import com.ticketflow.order.application.port.in.GetOrderUseCase;
 import com.ticketflow.order.application.port.in.ListOrdersUseCase;
@@ -48,13 +49,16 @@ public class OrderController {
     private final CreateOrderUseCase createOrder;
     private final GetOrderUseCase getOrder;
     private final ListOrdersUseCase listOrders;
+    private final CancelOrderUseCase cancelOrder;
 
     public OrderController(CreateOrderUseCase createOrder,
                            GetOrderUseCase getOrder,
-                           ListOrdersUseCase listOrders) {
+                           ListOrdersUseCase listOrders,
+                           CancelOrderUseCase cancelOrder) {
         this.createOrder = createOrder;
         this.getOrder = getOrder;
         this.listOrders = listOrders;
+        this.cancelOrder = cancelOrder;
     }
 
     /**
@@ -81,6 +85,22 @@ public class OrderController {
                 .accepted()
                 .location(uriBuilder.path("/api/v1/orders/{id}").build(result.order().id()))
                 .body(body);
+    }
+
+    /**
+     * Cancela o pedido de quem chamou.
+     *
+     * <p>{@code POST} e não {@code DELETE}: o pedido não deixa de existir, ele muda
+     * de estado — e o registro daquele cancelamento é parte do que a tela mostra.
+     *
+     * <p>Devolve o pedido já cancelado, para a tela não precisar consultar de novo.
+     * Cancelar um pedido já pago estoura transição inválida: pedido pago não se
+     * cancela, se estorna, e esse é outro fluxo com outras regras.
+     */
+    @PostMapping("/{orderId}/cancel")
+    public OrderResponse cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID orderId) {
+        UUID requester = AuthenticatedCustomer.from(jwt).id();
+        return OrderResponse.from(cancelOrder.execute(orderId, requester));
     }
 
     @GetMapping("/{orderId}")

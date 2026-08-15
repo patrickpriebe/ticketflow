@@ -32,13 +32,23 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfiguration {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            @Value("${ticketflow.observability.public-metrics:false}") boolean publicMetrics) throws Exception {
+
+        if (publicMetrics) {
+            http.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/prometheus").permitAll());
+        }
+
         return http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        // Só health e info. As métricas deste serviço são as mais
+                        // sensíveis dos três — receita aprovada e recusada por método
+                        // de pagamento — e ficam fechadas por padrão.
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Autenticado pela assinatura do Stripe, não por token.
                         .requestMatchers("/webhooks/stripe").permitAll()
                         .anyRequest().authenticated())

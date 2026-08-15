@@ -157,6 +157,21 @@ The other services copy these choices rather than reinventing them.
 - **Not-yours and not-found answer the same.** Asking for another customer's order or
   charge returns exactly what a non-existent one returns. A `403` would confirm the
   resource exists to whoever is probing ids.
+- **A value the client chooses is never looked up unscoped.** `Idempotency-Key` was
+  unique table-wide, and since a repeated key replays the order that owns it, sending
+  `Idempotency-Key: order-1` returned a stranger's order — name, e-mail and all. The
+  key is now scoped to the customer in the query *and* in the unique constraint. The
+  rule beyond this one bug: looking something up by a client-supplied value without
+  scoping it to the caller is an authorisation decision made by accident.
+- **The outbox row carries its own topic, and the publisher obeys it.** The relay used
+  to send everything to one fixed binding, which worked only while there was a single
+  topic. `ticketflow.outbox.bindings` maps topic → binding, and an unmapped topic
+  throws instead of silently publishing to the wrong destination — a cancellation
+  landing on `orders.created` would have the Payment Service charge a cancelled order.
+- **Dangerous defaults are safe even when they cost nothing today.**
+  `ticketflow.observability.public-metrics` is `false` by default; only the compose
+  file and the Kubernetes ConfigMap turn it on. Open, `/actuator/prometheus` gives away
+  order volume, approved and declined amounts, every route and the JVM version.
 
 ## Deployment traps that already cost a red deploy
 

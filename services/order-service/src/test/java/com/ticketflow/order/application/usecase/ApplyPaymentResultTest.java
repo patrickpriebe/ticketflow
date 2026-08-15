@@ -172,6 +172,60 @@ class ApplyPaymentResultTest {
     }
 
     @Test
+    @DisplayName("approval for a cancelled order is absorbed and flagged for refund")
+    void approvalAfterCancellation() {
+        // A corrida que o cancelamento assíncrono cria: a pessoa desistiu enquanto o
+        // gateway já estava cobrando. Sem este ramo a mensagem estoura, é reentregue
+        // três vezes e morre na DLQ - com o cartão cobrado e ninguém sabendo.
+        pendingOrder.cancel("Cancelled by the customer", NOW.plusSeconds(1));
+        when(orders.findById(pendingOrder.id())).thenReturn(Optional.of(pendingOrder));
+        ApplyPaymentResultUseCase.Command command = approved();
+
+        ApplyPaymentResultUseCase.Result result = applyPaymentResult.execute(command);
+
+        assertThat(result).isEqualTo(ApplyPaymentResultUseCase.Result.PAID_AFTER_CLOSE);
+        assertThat(pendingOrder.status()).isEqualTo(OrderStatus.CANCELLED);
+        // O estoque já voltou no cancelamento; confirmar a venda agora venderia
+        // entradas que outra pessoa pode ter comprado nesse meio tempo.
+        verify(catalog, never()).updateInventory(anyList());
+        verify(orders, never()).update(any());
+        // A mensagem foi consumida de verdade: reentregá-la não muda nada.
+        verify(processedEvents).record(command.eventId());
+    }
+
+    @Test
+    @DisplayName("a refusal for a cancelled order is simply consumed")
+    void refusalAfterCancellation() {
+        // Recusa mais cancelamento não tem compensação: ninguém pagou nada.
+        pendingOrder.cancel("Cancelled by the customer", NOW.plusSeconds(1));
+        when(orders.findById(pendingOrder.id())).thenReturn(Optional.of(pendingOrder));
+        ApplyPaymentResultUseCase.Command command = rejected();
+
+        ApplyPaymentResultUseCase.Result result = applyPaymentResult.execute(command);
+
+        assertThat(result).isEqualTo(ApplyPaymentResultUseCase.Result.IGNORED_CLOSED);
+        assertThat(pendingOrder.status()).isEqualTo(OrderStatus.CANCELLED);
+        // Quem cancelou já devolveu a reserva ao catálogo. Este caso de uso não pode
+        // encostar no estoque de novo: liberar duas vezes a mesma reserva colocaria
+        // à venda entradas que não existem.
+        verify(catalog, never()).updateInventory(anyList());
+        verify(catalog, never()).findById(any());
+        verify(processedEvents).record(command.eventId());
+    }
+
+    @Test
+    @DisplayName("an approval that arrives after the order expired is flagged for refund too")
+    void approvalAfterExpiry() {
+        pendingOrder.expire(NOW.plusSeconds(1));
+        when(orders.findById(pendingOrder.id())).thenReturn(Optional.of(pendingOrder));
+
+        ApplyPaymentResultUseCase.Result result = applyPaymentResult.execute(approved());
+
+        assertThat(result).isEqualTo(ApplyPaymentResultUseCase.Result.PAID_AFTER_CLOSE);
+        assertThat(pendingOrder.status()).isEqualTo(OrderStatus.EXPIRED);
+    }
+
+    @Test
     @DisplayName("a second, different approval for an already paid order is refused")
     void alreadyPaidOrder() {
         // Not the same as a redelivery: a different eventId saying "paid" again means

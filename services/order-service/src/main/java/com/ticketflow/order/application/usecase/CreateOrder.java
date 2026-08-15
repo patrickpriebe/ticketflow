@@ -57,8 +57,12 @@ public class CreateOrder implements CreateOrderUseCase {
     public Result execute(Command command) {
         Objects.requireNonNull(command, "command is required");
 
-        // Cheap path: this key was already used, so there is nothing to do.
-        Optional<Order> alreadyPlaced = orders.findByIdempotencyKey(command.idempotencyKey());
+        // Cheap path: this customer already used this key, so there is nothing to
+        // do. A chave é sempre procurada dentro do cliente que está chamando —
+        // procurá-la solta devolvia o pedido de outra pessoa para quem adivinhasse
+        // um valor comum.
+        Optional<Order> alreadyPlaced =
+                orders.findByIdempotencyKey(command.customer().id(), command.idempotencyKey());
         if (alreadyPlaced.isPresent()) {
             return Result.replayed(alreadyPlaced.get());
         }
@@ -69,7 +73,7 @@ public class CreateOrder implements CreateOrderUseCase {
             // A concurrent request with the same key committed first. The unique
             // constraint caught it - which is why the check above is an optimisation,
             // not the actual guarantee. Return that order instead of failing.
-            return orders.findByIdempotencyKey(command.idempotencyKey())
+            return orders.findByIdempotencyKey(command.customer().id(), command.idempotencyKey())
                     .map(Result::replayed)
                     .orElseThrow(() -> duplicate);
         }

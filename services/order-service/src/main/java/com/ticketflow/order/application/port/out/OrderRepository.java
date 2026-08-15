@@ -37,7 +37,16 @@ public interface OrderRepository {
 
     Optional<Order> findById(UUID orderId);
 
-    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+    /**
+     * A chave de idempotência daquele cliente, nunca a de qualquer um.
+     *
+     * <p>O {@code customerId} não é um filtro a mais: é o que impede que um
+     * cabeçalho escolhido por quem chama vire leitura do pedido alheio. Sem ele o
+     * replay devolvia o pedido de quem tivesse usado a chave primeiro — e
+     * {@code Idempotency-Key: order-1} é exatamente o tipo de valor que duas
+     * pessoas escolhem sem combinar.
+     */
+    Optional<Order> findByIdempotencyKey(UUID customerId, String idempotencyKey);
 
     PageResult<Order> findByCustomer(UUID customerId, OrderStatus status, PageQuery pageQuery);
 

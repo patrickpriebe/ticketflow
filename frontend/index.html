@@ -20,21 +20,11 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
 
-    <script>
-      // Antes da primeira pintura: sem isto a página aparece clara e escurece
-      // um quadro depois, no piscar que todo site com tema escuro tem quando a
-      // preferência só é lida dentro do React.
-      (function () {
-        try {
-          var stored = localStorage.getItem('ticketflow.theme');
-          if (stored === 'light' || stored === 'dark') {
-            document.documentElement.setAttribute('data-theme', stored);
-          }
-        } catch (e) {
-          /* localStorage bloqueado: o CSS decide pelo prefers-color-scheme */
-        }
-      })();
-    </script>
+    <!--
+      Sem `defer` e sem `type="module"`: os dois adiam a execução para depois do
+      parse, que é exatamente o quadro claro que este script existe para evitar.
+    -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -25,13 +25,22 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfiguration {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            @Value("${ticketflow.observability.public-metrics:false}") boolean publicMetrics) throws Exception {
+
+        if (publicMetrics) {
+            http.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/prometheus").permitAll());
+        }
+
         return http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        // Só health e info. As métricas ficam atrás da autenticação a
+                        // menos que alguém liberte explicitamente — ver Order Service.
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Ingresso é documento pessoal: nada aqui é público.
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

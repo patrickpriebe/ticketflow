@@ -1,6 +1,7 @@
 package com.ticketflow.order.infrastructure.config;
 
 import com.ticketflow.order.application.port.in.ApplyPaymentResultUseCase;
+import com.ticketflow.order.application.port.in.CancelOrderUseCase;
 import com.ticketflow.order.application.port.in.CreateOrderUseCase;
 import com.ticketflow.order.application.port.in.ExpirePendingOrdersUseCase;
 import com.ticketflow.order.application.port.in.GetEventUseCase;
@@ -13,6 +14,7 @@ import com.ticketflow.order.application.port.out.OrderRepository;
 import com.ticketflow.order.application.port.out.ProcessedEventRepository;
 import com.ticketflow.order.application.port.out.UnitOfWork;
 import com.ticketflow.order.application.usecase.ApplyPaymentResult;
+import com.ticketflow.order.application.usecase.CancelOrder;
 import com.ticketflow.order.application.usecase.CreateOrder;
 import com.ticketflow.order.application.usecase.ExpirePendingOrders;
 import com.ticketflow.order.application.usecase.GetEvent;
@@ -59,6 +61,19 @@ public class UseCaseConfiguration {
                                                                ProcessedEventRepository processedEvents,
                                                                UnitOfWork unitOfWork) {
         return new ApplyPaymentResult(orders, catalog, processedEvents, unitOfWork);
+    }
+
+    /**
+     * O cancelamento precisa do publicador porque o evento é o gatilho da
+     * compensação — sem ele o pedido cancela e a cobrança segue viva.
+     */
+    @Bean
+    public CancelOrderUseCase cancelOrderUseCase(OrderRepository orders,
+                                                 CatalogRepository catalog,
+                                                 DomainEventPublisher eventPublisher,
+                                                 UnitOfWork unitOfWork,
+                                                 Clock clock) {
+        return new CancelOrder(orders, catalog, eventPublisher, unitOfWork, clock);
     }
 
     @Bean

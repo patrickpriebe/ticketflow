@@ -207,6 +207,11 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # O Prometheus deste compose raspa /actuator/prometheus, entao aqui a rota
+      # fica aberta. Fora daqui ela e fechada por padrao: as metricas contam
+      # volume de pedidos, receita aprovada e recusada, cada rota da API e a
+      # versao da JVM - de graca para quem passar.
+      TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS: "${TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS:-true}"
       POSTGRES_USER: ${POSTGRES_USER:-ticketflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow}
     ports:
@@ -262,6 +267,11 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # O Prometheus deste compose raspa /actuator/prometheus, entao aqui a rota
+      # fica aberta. Fora daqui ela e fechada por padrao: as metricas contam
+      # volume de pedidos, receita aprovada e recusada, cada rota da API e a
+      # versao da JVM - de graca para quem passar.
+      TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS: "${TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS:-true}"
       POSTGRES_USER: ${POSTGRES_USER:-ticketflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow}
     ports:
@@ -293,6 +303,11 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # O Prometheus deste compose raspa /actuator/prometheus, entao aqui a rota
+      # fica aberta. Fora daqui ela e fechada por padrao: as metricas contam
+      # volume de pedidos, receita aprovada e recusada, cada rota da API e a
+      # versao da JVM - de graca para quem passar.
+      TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS: "${TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS:-true}"
       # Só arquiva no S3 se o LocalStack estiver de pé (perfil `aws`).
       TICKETFLOW_ARCHIVE_ENABLED: ${TICKETFLOW_ARCHIVE_ENABLED:-false}
     ports:

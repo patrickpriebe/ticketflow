@@ -37,6 +37,8 @@ spring:
       bindings:
         orderCreated-out-0:
           destination: ticketflow.orders.created
+        orderCancelled-out-0:
+          destination: ticketflow.orders.cancelled
         paymentProcessed-in-0:
           destination: ticketflow.payments.processed
           # The consumer group is also the inbox key in processed_events.
@@ -151,7 +153,10 @@ ticketflow:
     batch-size: 50
     # After this many failed sends the message is parked as FAILED for inspection.
     max-attempts: 8
-    output-binding: orderCreated-out-0
+    # Tópico gravado na linha do outbox -> binding do Spring Cloud Stream. Um
+    # tópico ausente daqui estoura no envio; é de propósito, porque a alternativa
+    # é publicar no destino errado sem ninguém perceber.
+    bindings: "{'ticketflow.orders.created': 'orderCreated-out-0', 'ticketflow.orders.cancelled': 'orderCancelled-out-0'}"
 
 ---
 # Running from the IDE / `mvnw spring-boot:run` on Windows.
@@ -178,6 +183,10 @@ ticketflow:
     # projeto seria atrito puro. Fora daqui os dois voltam a ser obrigatórios.
     secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
     dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+  observability:
+    # O Prometheus do compose raspa daqui. Fora do desenvolvimento a rota fica
+    # fechada por padrão — ver o SecurityConfiguration para o que ela entrega.
+    public-metrics: ${TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS:true}
 
 ---
 # Kubernetes. Everything comes from the ConfigMap and Secret - no defaults here on
@@ -217,6 +226,10 @@ ticketflow:
     # Mesma escolha do perfil `local`: o compose é ambiente de demonstração.
     secret: ${TICKETFLOW_AUTH_SECRET:desenvolvimento-local-troque-isto-em-producao}
     dev-tokens: ${TICKETFLOW_DEV_TOKENS:true}
+  observability:
+    # O Prometheus do compose raspa daqui. Fora do desenvolvimento a rota fica
+    # fechada por padrão — ver o SecurityConfiguration para o que ela entrega.
+    public-metrics: ${TICKETFLOW_OBSERVABILITY_PUBLIC_METRICS:true}
 
 ---
 # Nuvem gerenciada: Supabase (Postgres) e Redpanda (Kafka).

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ticketflow.dev/schemas/events/order-cancelled.v1.json",
+  "title": "ORDER_CANCELLED (v1)",
+  "description": "Published by Order Service to `ticketflow.orders.cancelled` when the customer gives up on an order. Consumed by the Payment Service, where it is the compensation trigger.\n\nIt is a separate topic from `orders.created` because the consumer reads it for the opposite reason: one starts a charge, the other undoes it. Sharing a topic would force the Payment Service to discriminate by type inside a single flow, and a routing mistake there means charging a cancelled order.\n\nTwo orderings are possible and both are normal:\n\n  * cancellation reaches the Payment Service before it charged - nothing is charged\n  * cancellation reaches it after - the money left, and the answer is a refund\n\nKafka orders within a partition, not across topics, so the consumer must handle both. The record key is the orderId, the same key used on `orders.created`.\n\n`totalAmount` and `currency` travel in the event so the refunder knows how much to give back without asking anyone. Looking it up would be the synchronous service-to-service call this project does not allow.",
+  "allOf": [{ "$ref": "./envelope.schema.json" }],
+  "type": "object",
+  "properties": {
+    "eventType": { "const": "ORDER_CANCELLED" },
+    "eventVersion": { "const": 1 },
+    "producer": { "const": "order-service" },
+    "data": {
+      "type": "object",
+      "required": ["orderId", "customerId", "reason", "totalAmount", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "orderId": { "type": "string", "format": "uuid" },
+        "customerId": { "type": "string", "format": "uuid" },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why the order ended. Today always the customer's own request; the expiry job is a different status and does not publish this event."
+        },
+        "totalAmount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The full order amount. The upper bound of what may need refunding - the Payment Service refunds what it actually captured, never more."
+        },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "5f8d1c2b-9e4a-4d37-8b61-0c7e2a9f4d13",
+      "eventType": "ORDER_CANCELLED",
+      "eventVersion": 1,
+      "occurredAt": "2026-08-10T14:07:41Z",
+      "producer": "order-service",
+      "correlationId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "data": {
+        "orderId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "customerId": "3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10",
+        "reason": "Cancelled by the customer",
+        "totalAmount": 1300.00,
+        "currency": "BRL"
+      }
+    }
+  ]
+}

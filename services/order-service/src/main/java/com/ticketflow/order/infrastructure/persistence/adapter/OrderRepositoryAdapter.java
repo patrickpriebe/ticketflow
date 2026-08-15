@@ -106,8 +106,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Order> findByIdempotencyKey(String idempotencyKey) {
-        return jpaOrders.findByIdempotencyKey(idempotencyKey).map(OrderMapper::toDomain);
+    public Optional<Order> findByIdempotencyKey(UUID customerId, String idempotencyKey) {
+        return jpaOrders.findByCustomerIdAndIdempotencyKey(customerId, idempotencyKey)
+                .map(OrderMapper::toDomain);
     }
 
     @Override

@@ -109,7 +109,7 @@ class CreateOrderTest {
     void placesPendingOrder() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
         TicketCategory pista = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
         givenSaveEchoesBack();
 
@@ -126,7 +126,7 @@ class CreateOrderTest {
     void publishesOrderCreated() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
         TicketCategory pista = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
         givenSaveEchoesBack();
 
@@ -147,7 +147,7 @@ class CreateOrderTest {
     void persistsReservedInventory() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
         TicketCategory pista = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
         givenSaveEchoesBack();
 
@@ -168,7 +168,7 @@ class CreateOrderTest {
         TicketCategory pista = event.categories().get(0);
         Order original = Order.place(IDEMPOTENCY_KEY, customer, event, PaymentMethod.CREDIT_CARD,
                 List.of(new RequestedItem(pista.id(), 1)), NOW, PAYMENT_WINDOW);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(original));
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.of(original));
 
         CreateOrderUseCase.Result result = createOrder.execute(command(event, pista.id(), 1));
 
@@ -183,6 +183,34 @@ class CreateOrderTest {
     }
 
     @Test
+    @DisplayName("the same key from a different customer is a new order, never a replay of someone else's")
+    void idempotencyKeyIsScopedToTheCustomer() {
+        // O vazamento que este teste fecha: a chave era procurada solta, então
+        // mandar `Idempotency-Key: order-1` devolvia 200 com o pedido de quem
+        // tivesse usado esse valor antes — nome, e-mail e o que a pessoa comprou.
+        // Nenhum token alheio, nenhuma sondagem de id: só um cabeçalho comum.
+        TicketEvent event = CatalogFixtures.onSaleEvent();
+        TicketCategory pista = event.categories().get(0);
+        Customer stranger = new Customer(UUID.randomUUID(), "Bruno Lima", "bruno.lima@example.com");
+        Order theirOrder = Order.place(IDEMPOTENCY_KEY, stranger, event, PaymentMethod.CREDIT_CARD,
+                List.of(new RequestedItem(pista.id(), 1)), NOW, PAYMENT_WINDOW);
+
+        // A busca é sempre dentro de quem chama. Para este cliente a chave é nova,
+        // ainda que o outro já a tenha gasto.
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        givenCatalogHas(event);
+        givenSaveEchoesBack();
+
+        CreateOrderUseCase.Result result = createOrder.execute(command(event, pista.id(), 1));
+
+        assertThat(result.replayed()).isFalse();
+        assertThat(result.order().id()).isNotEqualTo(theirOrder.id());
+        assertThat(result.order().customer().id()).isEqualTo(customer.id());
+        // E, principalmente: nada do outro cliente saiu daqui.
+        assertThat(result.order().customer().email()).isNotEqualTo(stranger.email());
+    }
+
+    @Test
     @DisplayName("when a concurrent request wins the race, returns that order instead of failing")
     void losesIdempotencyRaceGracefully() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
@@ -193,7 +221,7 @@ class CreateOrderTest {
         // First lookup finds nothing; the insert then loses to the unique constraint;
         // the second lookup finds the winner. This is the window that makes a
         // check-then-insert idempotency scheme wrong on its own.
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY))
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(winner));
         givenCatalogHas(event);
@@ -211,7 +239,7 @@ class CreateOrderTest {
     void unresolvableDuplicateIsRethrown() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
         TicketCategory pista = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
         when(orders.save(any(Order.class)))
                 .thenThrow(new DuplicateIdempotencyKeyException(IDEMPOTENCY_KEY));
@@ -224,7 +252,7 @@ class CreateOrderTest {
     @DisplayName("refuses an unknown event and writes nothing")
     void unknownEvent() {
         UUID missingEventId = UUID.randomUUID();
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         when(catalog.findById(missingEventId)).thenReturn(Optional.empty());
 
         CreateOrderUseCase.Command command = new CreateOrderUseCase.Command(
@@ -242,7 +270,7 @@ class CreateOrderTest {
     @DisplayName("refuses a category belonging to another event")
     void categoryFromAnotherEvent() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
 
         assertThatThrownBy(() -> createOrder.execute(command(event, UUID.randomUUID(), 1)))
@@ -257,7 +285,7 @@ class CreateOrderTest {
     void salesWindowClosed() {
         TicketEvent event = CatalogFixtures.salesClosedEvent();
         TicketCategory plateia = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
 
         assertThatThrownBy(() -> createOrder.execute(command(event, plateia.id(), 1)))
@@ -274,7 +302,7 @@ class CreateOrderTest {
         TicketCategory almostGone = CatalogFixtures.category(
                 UUID.randomUUID(), eventId, "Camarote", "2400.00", 2);
         TicketEvent event = CatalogFixtures.onSaleEvent(eventId, List.of(almostGone));
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
 
         assertThatThrownBy(() -> createOrder.execute(command(event, almostGone.id(), 4)))
@@ -290,7 +318,7 @@ class CreateOrderTest {
     void savesOnce() {
         TicketEvent event = CatalogFixtures.onSaleEvent();
         TicketCategory pista = event.categories().get(0);
-        when(orders.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(orders.findByIdempotencyKey(customer.id(), IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
         givenCatalogHas(event);
         givenSaveEchoesBack();
 

@@ -43,6 +43,13 @@ create_topic "ticketflow.orders.created"          3 604800000    # 7 days
 # Payment Service  ->  Order Service + Notification Service
 create_topic "ticketflow.payments.processed"      3 604800000    # 7 days
 
+# Order Service  ->  Payment Service (compensation trigger)
+# Same 3 partitions and the same key as orders.created, so every event about one
+# order lands on the same partition. Kafka orders within a partition, not across
+# topics - the Payment Service still has to cope with a cancellation arriving
+# before or after it charged the card.
+create_topic "ticketflow.orders.cancelled"        3 604800000    # 7 days
+
 # Dead letter topics: kept much longer, they are the debugging trail.
 create_topic "ticketflow.orders.created.dlq"      1 2592000000   # 30 days
 create_topic "ticketflow.payments.processed.dlq"  1 2592000000   # 30 days

@@ -58,6 +58,29 @@ public class ApplyPaymentResult implements ApplyPaymentResultUseCase {
         Order order = orders.findById(command.orderId())
                 .orElseThrow(() -> new OrderNotFoundException(command.orderId()));
 
+        // O pedido já acabou antes da resposta chegar — cancelado pelo cliente ou
+        // expirado pelo prazo. Não é erro, é corrida: as duas coisas estavam em voo
+        // ao mesmo tempo e nada as coordenava.
+        //
+        // Sem este ramo, `markPaid` estoura numa transição inválida, a mensagem é
+        // reentregue três vezes e termina na DLQ. O estado que isso deixa é o pior
+        // possível: o cartão foi cobrado, o pedido está cancelado, e a única prova
+        // disso está numa fila que ninguém lê.
+        //
+        // Quem devolve o dinheiro não é este serviço — é quem o cobrou. O
+        // `ORDER_CANCELLED` publicado no cancelamento é o gatilho, e o Payment
+        // Service estorna ao recebê-lo. Aqui basta absorver a resposta tardia sem
+        // perdê-la e sem mentir sobre o estado do pedido.
+        //
+        // Só cancelado e expirado entram aqui, não "terminal" inteiro: um pedido
+        // já PAID recebendo outra aprovação é inconsistência de quem publicou, e
+        // continua estourando abaixo. Absorvê-lo aqui mandaria estornar uma compra
+        // legítima — foi o que o teste `alreadyPaidOrder` pegou.
+        if (order.status().isClosedWithoutPayment()) {
+            processedEvents.record(command.eventId());
+            return command.approved() ? Result.PAID_AFTER_CLOSE : Result.IGNORED_CLOSED;
+        }
+
         // Transition first: an illegal transition must abort before anything else is
         // touched, and it says something is wrong upstream rather than here.
         if (command.approved()) {

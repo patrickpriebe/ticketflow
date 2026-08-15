@@ -50,6 +50,26 @@ class AuthDefaultsTest {
     }
 
     @Test
+    @DisplayName("a rota de metricas nao vem publica na configuracao base")
+    void publicMetricsDefaultsToOff() throws IOException {
+        assertThat(baseDocument())
+                .as("""
+                        A configuração base não pode liberar /actuator/prometheus.
+
+                        Ela já esteve aberta sem condição nenhuma, e no Render isso
+                        entrega a qualquer pessoa o volume de pedidos, quanto foi
+                        aprovado e recusado, cada rota da API e a versão exata da JVM
+                        — um mapa do sistema para quem estiver escolhendo por onde
+                        começar. Lá ninguém raspa essas métricas, então fechar não
+                        custa nada.
+
+                        O padrão vive no SecurityConfiguration e vale `false`. Os
+                        perfis `local` e `docker` ligam de propósito, porque ali existe
+                        um Prometheus do outro lado.""")
+                .doesNotContain("public-metrics");
+    }
+
+    @Test
     @DisplayName("o segredo de assinatura nao tem chave de exemplo na configuracao base")
     void signingSecretHasNoUsableDefault() throws IOException {
         assertThat(baseDocument())
