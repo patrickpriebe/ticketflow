@@ -2,229 +2,341 @@
 
 [![CI](https://github.com/patrickpriebe/ticketflow/actions/workflows/ci.yml/badge.svg)](https://github.com/patrickpriebe/ticketflow/actions/workflows/ci.yml)
 
-Sistema distribuído de venda de ingressos: três microsserviços Spring Boot que
-conversam só por eventos, dois bancos com papéis diferentes, e infraestrutura que
-sobe inteira com um comando.
+A distributed ticket-selling system: three Spring Boot microservices that talk only
+through events, two databases with different jobs, a React frontend with no runtime
+dependencies beyond React itself, and infrastructure that comes up with one command.
 
-O ponto do projeto é uma decisão só: **o pedido é aceito sem esperar o pagamento**.
-A API responde `202 Accepted` em milissegundos, o pagamento acontece depois em outro
-processo, e o cliente acompanha o status. Tudo o mais no repositório existe para
-sustentar essa premissa.
+**Live: https://ticketflow-br.vercel.app**
 
-- [Arquitetura](docs/01-arquitetura.md) — por que Kafka, por que outbox, por que dois bancos
-- [Modelagem de dados](docs/02-modelagem-dados.md) — as tabelas, as coleções e o motivo de cada escolha
-- [Eventos Kafka](docs/03-eventos-kafka.md) — tópicos, envelope, retry, DLQ
-- [Frontend](docs/04-frontend.md) — design system, temas e as decisões da tela
-- [Roadmap do produto](docs/05-roadmap-produto.md) — o que ainda não existe, e o que fica de fora
-- [Contrato da API](contracts/openapi/order-service.yaml) — OpenAPI 3.0 do Order Service
+The whole project rests on a single decision: **an order is accepted without waiting
+for the payment.** The API answers `202 Accepted` in milliseconds, the charge happens
+later in another process, and the customer watches the status change. Everything else
+in this repository exists to support that premise honestly — including the parts that
+make it harder.
 
 ---
 
-## No ar
+## Table of contents
 
-**https://ticketflow-br.vercel.app**
-
-O front está na Vercel e os três serviços no Render, contra bancos gerenciados —
-Supabase para os pedidos, Neon para os pagamentos, MongoDB Atlas para os ingressos
-— e Redpanda no lugar do Kafka. Nada disso muda uma linha do código de domínio: são
-outras URLs e outras credenciais no perfil `cloud`.
-
-Duas ressalvas honestas sobre o ambiente publicado:
-
-- **Entrar é com Google.** O emissor de token de desenvolvimento assina para
-  qualquer e-mail sem verificar senha e está desligado fora do ambiente local, de
-  propósito. Lá quem emite identidade é o Google, e os dois serviços só validam:
-  assinatura contra o JWKS dele, emissor, validade e `aud` igual ao nosso client
-  id. A sessão dura uma hora — é o tempo de vida do ID token, e não há refresh.
-- **O primeiro acesso pode demorar.** No plano gratuito do Render a instância
-  hiberna, e acordar uma JVM leva perto de um minuto. Um agendamento mantém os
-  serviços de pé durante o dia sem estourar as 750 horas mensais.
-
----
-
-## Como subir
-
-Só precisa de **Docker Desktop**. Na raiz do repositório:
-
-```bash
-docker compose up -d
-```
-
-Sobe PostgreSQL, MongoDB e Kafka, aplica as migrations, cria os tópicos e abre o
-Kafka UI. As portas dão para ajustar copiando `.env.example` para `.env`.
-
-Para derrubar tudo:
-
-```bash
-docker compose down
-```
-
-Para derrubar **e apagar os dados** (faz os scripts de init rodarem de novo):
-
-```bash
-docker compose down -v
-```
-
-### O que fica exposto
-
-| Serviço | Endereço | Credenciais |
-|---|---|---|
-| PostgreSQL | `localhost:5433` | `ticketflow` / `ticketflow` |
-| MongoDB | `localhost:27017` | `root` / `root` (app: `ticketflow` / `ticketflow`) |
-| Kafka | `localhost:9092` | — |
-| Kafka UI | http://localhost:8085 | — |
-| Prometheus | http://localhost:9091 | perfil `observability` |
-| Grafana | http://localhost:3002 | perfil `observability`, entra direto |
-
-> **Postgres está em 5433, não 5432.** A 5432 costuma já estar tomada por uma
-> instalação nativa de PostgreSQL na máquina. Dentro da rede Docker o serviço
-> continua em `postgres:5432` — só o mapeamento para o host muda.
-
-São credenciais de desenvolvimento local. Não servem para nada além disso.
-
-### Conferindo que subiu
-
-```bash
-docker compose ps
-```
-
-```bash
-docker exec ticketflow-postgres psql -U ticketflow -d ticketflow_orders -c "\dt"
-```
-
-```bash
-docker exec ticketflow-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list
-```
-
-O catálogo já vem com três eventos de demonstração — o seed em
-`db/seed/R__seed_demo_catalogue.sql` só é aplicado no ambiente local.
+- [What it does](#what-it-does)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [The rule that is never broken](#the-rule-that-is-never-broken)
+- [Data model](#data-model)
+- [Event flow](#event-flow)
+- [Payments](#payments)
+- [Identity and security](#identity-and-security)
+- [Frontend](#frontend)
+- [Observability](#observability)
+- [CI/CD](#cicd)
+- [Kubernetes](#kubernetes)
+- [Cloud deployment](#cloud-deployment)
+- [Running locally](#running-locally)
+- [Testing strategy](#testing-strategy)
+- [Engineering decisions worth reading](#engineering-decisions-worth-reading)
+- [Known limits](#known-limits)
 
 ---
 
-## Order Service
+## What it does
 
-A API de pedidos. O que ela faz de interessante cabe em uma frase: `POST /orders`
-grava o pedido e o evento `ORDER_CREATED` **na mesma transação** e responde `202` —
-ninguém foi cobrado ainda.
+A customer browses a public catalogue, picks ticket categories, signs in with Google,
+and places an order. The order is accepted immediately and the tickets are reserved.
+The payment resolves in the background; when it is approved, the tickets are issued
+and appear with a QR code.
 
-### Rodando
-
-Precisa de JDK 21. Com a infraestrutura de pé (`docker compose up -d`):
-
-```bash
-cd services/order-service && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-- API: http://localhost:8080/api/v1/events
-- Swagger UI: http://localhost:8080/swagger-ui.html (servindo o contrato da fase 1)
-- Health: http://localhost:8080/actuator/health
-
-### Testes
-
-```bash
-cd services/order-service && ./mvnw test
-```
-
-São 38 testes unitários, sem Docker e sem contexto Spring — domínio puro e casos de
-uso com fakes. Os de integração sobem um PostgreSQL de verdade:
-
-```bash
-cd services/order-service && ./mvnw verify
-```
-
-> **Se o Testcontainers não achar o Docker no Windows**, aponte os testes de
-> integração para um banco já rodando. Com o Rancher Desktop a Engine API não fica
-> acessível para clientes JVM, mesmo com o CLI funcionando normalmente — foi o caso
-> nesta máquina. Crie o banco uma vez:
->
-> ```bash
-> docker exec ticketflow-postgres psql -U ticketflow -d postgres -c "CREATE DATABASE ticketflow_orders_it"
-> ```
->
-> e rode:
->
-> ```bash
-> cd services/order-service && ./mvnw verify -Dticketflow.it.datasource.url=jdbc:postgresql://localhost:5433/ticketflow_orders_it
-> ```
->
-> O banco apontado é **apagado** a cada teste; nunca use o `ticketflow_orders`.
-
-### Como o código está organizado
-
-```
-domain/          entidades e regras. Não importa Spring, JPA nem Kafka.
-application/     casos de uso + portas (interfaces). Também sem framework.
-infrastructure/  web, persistência, outbox, configuração. Todo o Spring vive aqui.
-```
-
-Três detalhes que valem explicar numa entrevista:
-
-- **`UnitOfWork` em vez de `@Transactional` no caso de uso.** O `INSERT` do pedido e
-  o do outbox precisam da mesma transação, mas anotar o caso de uso o acoplaria ao
-  Spring. A porta `UnitOfWork` é implementada com `TransactionTemplate` na
-  infraestrutura, e o teste unitário injeta uma versão que só executa o bloco.
-- **Idempotência pela constraint, não por `SELECT` antes.** O `SELECT` é só
-  otimização; quem garante é `uq_orders_idempotency_key`. Se duas requisições com a
-  mesma chave correm juntas, a que perde recarrega o pedido da vencedora e devolve
-  `200`. Tem teste para essa corrida.
-- **O relay publica depois de commitar, nunca antes.** Isso torna a entrega
-  *at-least-once*: se o processo cair entre o envio e o `UPDATE`, a mensagem sai duas
-  vezes. É a troca certa — duplicata os consumidores tratam, evento perdido ninguém
-  recupera.
+| Flow | What the customer sees |
+|---|---|
+| Browse | Public catalogue, filters by city, price and text — no login required |
+| Cart | Multiple ticket categories per order, kept across reloads |
+| Sign in | Google. The site never sees a password |
+| Checkout | Payment method, order summary, `202` in milliseconds |
+| Order page | Status starts at *awaiting payment* and changes on its own |
+| Card | Stripe Elements confirms the card without the number touching our servers |
+| Tickets | Issued after approval, listed with QR code |
 
 ---
 
-## Vendo o sistema inteiro funcionar
+## Architecture
 
-Sobe tudo, incluindo os dois serviços e o gateway simulado:
+```mermaid
+flowchart TB
+    subgraph browser["Browser"]
+        FE["React SPA<br/>Vercel"]
+    end
 
-```bash
-docker compose --profile apps up -d --build
+    subgraph services["Services · Render"]
+        OS["Order Service<br/>REST API"]
+        PS["Payment Service<br/>Kafka worker + webhook"]
+        NS["Notification Service<br/>read model + tickets"]
+    end
+
+    subgraph data["Managed data"]
+        PG1[("PostgreSQL<br/>orders · Supabase")]
+        PG2[("PostgreSQL<br/>payments · Neon")]
+        MG[("MongoDB<br/>tickets · Atlas")]
+    end
+
+    K{{"Kafka · Redpanda<br/>orders.created<br/>payments.processed"}}
+    ST["Stripe"]
+    GO["Google<br/>identity provider"]
+
+    FE -->|"catalogue, orders"| OS
+    FE -->|"client_secret"| PS
+    FE -->|"tickets"| NS
+    FE -.->|"ID token"| GO
+
+    OS --> PG1
+    PS --> PG2
+    NS --> MG
+
+    OS -->|"publishes"| K
+    K -->|"consumes"| PS
+    PS -->|"publishes"| K
+    K -->|"consumes"| OS
+    K -->|"consumes"| NS
+
+    PS -->|"charge"| ST
+    ST -->|"signed webhook"| PS
 ```
 
-Faça dois pedidos. O gateway simulado recusa qualquer cobrança acima de 2000, então
-um **Camarote** (2400) é negado e uma **Pista** (650) é aprovada — os dois ramos do
-fluxo, sem configurar nada:
+Three services, each owning its data, communicating exclusively through Kafka. The
+browser talks to all three; **the services never talk to each other.**
 
-```bash
-curl -X POST http://localhost:8081/api/v1/orders -H "Content-Type: application/json" -H "Idempotency-Key: $(uuidgen)" -d '{"customer":{"id":"3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10","name":"Ana Souza","email":"ana.souza@example.com"},"eventId":"11111111-1111-4111-8111-111111111111","paymentMethod":"CREDIT_CARD","items":[{"ticketCategoryId":"aaaaaaaa-0001-4000-8000-000000000001","quantity":2}]}'
-```
-
-A resposta é **202** com `status: PENDING`. Poucos segundos depois:
-
-```bash
-curl http://localhost:8081/api/v1/orders/{id}
-```
-
-O que aconteceu nesse intervalo, sem nenhuma chamada síncrona entre serviços:
-
-```
-POST /orders ──► pedido PENDING + evento no outbox   (mesma transação)
-                          │
-                 relay, ~1s depois
-                          ▼
-              ticketflow.orders.created   (chave = orderId)
-                          │
-                          ▼
-              Payment Service cobra o gateway
-                          │
-                          ▼
-            ticketflow.payments.processed
-                          │
-                          ▼
-          pedido vira PAID ou REJECTED, estoque acerta
-```
-
-Resultado real dos dois pedidos:
-
-| Pedido | Valor | Gateway | Status final |
+| Service | Role | Storage | HTTP surface |
 |---|---|---|---|
-| Pista ×2 | 1300,00 | aprovado | **`PAID`**, reserva vira venda |
-| Camarote ×1 | 2400,00 | recusado | **`REJECTED`**, ingressos voltam ao estoque |
+| **Order** | Catalogue, orders, inventory reservation | PostgreSQL | `/api/v1/events`, `/api/v1/orders` |
+| **Payment** | Charges the provider, settles from webhooks | PostgreSQL | `/webhooks/stripe`, `/api/v1/payments/by-order/{id}` |
+| **Notification** | Read model, issues tickets | MongoDB | `/api/v1/tickets` |
 
-Para ver as mensagens cruas, o [Kafka UI](http://localhost:8085); para ver o que o
-Payment Service enviou ao gateway, incluindo o `Idempotency-Key`,
-http://localhost:8090/__admin/requests.
+---
+
+## Tech stack
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Language | **Java 21** | Records, sealed switch, pattern matching |
+| Framework | **Spring Boot 3.5.3** | Web, Data JPA, Security, Actuator |
+| Messaging | **Spring Cloud Stream 2025.0.0** + Kafka binder | `StreamBridge` to publish, `Consumer<Message<String>>` to consume |
+| Transactional data | **PostgreSQL** + Flyway | Orders and payments, separate databases |
+| Documents | **MongoDB** | Tickets and order snapshots |
+| Payments | **Stripe** (`stripe-java` 29.2.0) | PaymentIntents, signed webhooks, Elements |
+| Identity | **Google OAuth 2.0** / OIDC | Resource servers validate; nobody issues |
+| Metrics | Micrometer → **Prometheus** → **Grafana** | 11 provisioned panels |
+| Frontend | **React 18** + **TypeScript 5.7** + **Vite 6** | Zero runtime dependencies beyond React |
+| Tests | JUnit 5, Mockito, AssertJ, **WireMock**, **EmbeddedKafka** | 174 tests |
+| CI/CD | **GitHub Actions** | Build, test, secret scan, contract lint, image build |
+| Orchestration | **Docker Compose** (local) · **Kubernetes** manifests · **Render** (deployed) | |
+
+Each service is an independent Maven project with its own `pom.xml` and `mvnw`.
+There is no parent POM and no shared events module: coupling the three at compile
+time would undo much of the point of separating them at runtime.
+
+---
+
+## The rule that is never broken
+
+> **No synchronous call between Order, Payment and Notification.**
+
+If a `RestTemplate`, `WebClient` or `FeignClient` ever points from one service to
+another, that is an architecture bug. The only permitted outbound HTTP is the Payment
+Service calling the external gateway.
+
+This rule shaped a real decision late in the project. Stripe Elements needs the
+PaymentIntent's `client_secret`, which is born inside the Payment Service — and the
+browser only talked to Order and Notification. Three options existed:
+
+1. Order Service fetches it from Payment — **forbidden**, that is service-to-service HTTP.
+2. Ship the `client_secret` through a Kafka event — spreads a payment credential across
+   another service's topic and database, and teaches Order what Stripe is.
+3. **The browser talks to the Payment Service directly.**
+
+The third was chosen. It does not break the rule — the rule forbids *service calling
+service*, not *browser calling service*. The browser now talks to three services, and
+the three still do not talk to each other.
+
+---
+
+## Data model
+
+**Transactional data goes to PostgreSQL. Documents and history go to MongoDB.** An
+entity is not pushed into Mongo just because Mongo code happens to be nearby.
+
+### PostgreSQL — orders
+
+| Table | Purpose |
+|---|---|
+| `ticket_events`, `ticket_categories` | Catalogue and inventory counters |
+| `orders`, `order_items` | The order and its lines |
+| `order_status_history` | Every transition, with its cause |
+| `outbox_messages` | Events written in the same transaction as the business write |
+| `processed_events` | Inbox: what this consumer group already handled |
+
+### PostgreSQL — payments
+
+| Table | Purpose |
+|---|---|
+| `payments` | One row per order, `UNIQUE(order_id)` as the last guard against double charging |
+| `payment_attempts` | Every gateway call, with outcome, latency and masked payload |
+| `payment_webhook_events` | Inbox for provider callbacks, PK `(provider, event_id)` |
+| `outbox_messages`, `processed_events` | Same pattern as Order |
+
+### MongoDB — notifications
+
+| Collection | Purpose |
+|---|---|
+| `order_snapshots` | CQRS read model, built from `ORDER_CREATED` |
+| `tickets` | Issued tickets with QR payload |
+| `notifications` | What was sent, and when |
+| `processed_events` | Inbox, with a 30-day TTL |
+
+Money is `BigDecimal` in Java and `NUMERIC(12,2)` in PostgreSQL. Never `double`.
+
+Card data is never persisted, never logged and never published in an event — only
+the brand and the last four digits.
+
+Full modelling notes: [docs/02-modelagem-dados.md](docs/02-modelagem-dados.md).
+
+---
+
+## Event flow
+
+Two topics, each with a dead-letter queue:
+
+```
+ticketflow.orders.created       → ticketflow.orders.created.dlq
+ticketflow.payments.processed   → ticketflow.payments.processed.dlq
+```
+
+Every message carries a versioned envelope (`eventId`, `eventType`, `occurredAt`,
+`producer`, `data`), validated by JSON Schema in [`contracts/events/`](contracts/events/).
+The partition key is always the `orderId`, so everything about one order stays ordered.
+
+### The transactional outbox
+
+`POST /orders` writes the order **and** the `ORDER_CREATED` event in the same
+transaction, then answers `202`. A separate relay polls the outbox with
+`FOR UPDATE SKIP LOCKED` and publishes to Kafka.
+
+`SKIP LOCKED` is what allows several instances of the service to run the relay at
+once without two of them publishing the same row.
+
+**The relay publishes after committing, never before.** That makes delivery
+*at-least-once*: if the process dies between the send and the `UPDATE`, the message
+goes out twice. That is the correct trade — consumers deduplicate, but a lost event is
+unrecoverable.
+
+### Idempotency
+
+Every Kafka consumer checks `processed_events` before acting. Delivery is at-least-once;
+assuming exactly-once is a defect.
+
+The order lifecycle:
+
+```
+POST /orders ──► PENDING + event in outbox        (one transaction)
+                        │
+                   relay, ~1s
+                        ▼
+            ticketflow.orders.created             (key = orderId)
+                        │
+          ┌─────────────┴─────────────┐
+          ▼                           ▼
+   Payment Service              Notification Service
+   charges the provider         builds the read model
+          │
+          ▼
+   ticketflow.payments.processed
+          │
+          ├────────────► Order: PAID or REJECTED, inventory settles
+          └────────────► Notification: issues tickets
+```
+
+---
+
+## Payments
+
+### One strategy per method
+
+Adding a payment method means writing a new `PaymentStrategy`, not another branch in
+an `if/else`. The registry refuses to start if any method lacks a strategy — a boot
+error, not a customer's failed purchase.
+
+The strategy also decides whether a timeout may be retried: card and PIX yes, boleto
+no, because a retry would generate a second boleto.
+
+### Three outcomes, not two
+
+This distinction carries the whole service:
+
+| Outcome | Meaning | What happens |
+|---|---|---|
+| `REJECTED` | The provider said no | Publishes `PAGAMENTO_RECUSADO` |
+| `ACCEPTED` | The provider took it, the answer comes later | Publishes nothing; waits for the webhook |
+| `FAILED` | Timeout or 5xx — **nobody knows if money moved** | Publishes nothing, records nothing, lets the message be redelivered |
+
+Turning "the gateway did not answer" into "your card was declined" would be a lie to
+the customer. `ACCEPTED` had to exist because of boleto: calling it approved would
+hand out a ticket nobody paid for; calling it failed would cancel a valid order.
+
+### Stripe
+
+- **PaymentIntents** with idempotency keys, so a retried call cannot charge twice.
+- **Webhook signature verified over the raw body** with HMAC. Without the secret the
+  endpoint answers `503` and refuses everything — accepting unverified callbacks would
+  let anyone forge a payment approval.
+- **Card confirmation happens in the browser** through Stripe Elements. The card
+  number goes straight to Stripe in an iframe; our code only ever touches the
+  `client_secret`, which authorises that one charge and nothing else.
+- The `client_secret` is **never persisted**. It is read from Stripe on demand by the
+  charge id we already store, and only while there is still something to confirm.
+
+A simulated gateway (WireMock) remains available for local development, so the whole
+system runs without an account at any provider.
+
+---
+
+## Identity and security
+
+The services are **resource servers**: they validate tokens and never issue them.
+Storing passwords would be assuming a risk that does not belong to them.
+
+### The validation most tutorials forget
+
+A valid signature and the right issuer prove that Google issued the token. They do
+**not** prove it was issued for us. Google signs tokens for everyone — any registered
+application gets a legitimate token with the same signature and the same `iss`. And
+since Google's `sub` is the same across applications, such a token would open the
+person's real account here.
+
+So `audience` is compared against our client id, and **the service refuses to boot**
+if an issuer is configured without one. Getting this wrong breaks no test and shows up
+in no code review — the service starts, answers, and is simply open.
+
+### Identity is derived, not taken raw
+
+The domain uses UUIDs; an identity provider is not obliged to. Google returns a number.
+All three services apply the **same** rule — a `sub` that is already a UUID passes
+through, otherwise the id is derived from `issuer|sub`.
+
+The issuer is part of the derivation because two providers can use the same `sub` for
+different people, and without it that eventually becomes a merged account.
+
+All three sides have a test with the same pinned vector, so divergence breaks the
+build instead of losing tickets in production.
+
+### Secrets
+
+Two layers, both tested in both directions:
+
+- A **pre-commit hook** that scans by credential *format* — `sk_live`, `whsec_`, `ghp_`,
+  `AKIA`, connection strings with passwords, private keys.
+- A **CI job** that scans the entire history, prints the commit and file, and never the
+  matching line.
+
+Dangerous flags default to safe, and secrets have no default at all. The dev token
+issuer — which signs a token for any email without a password — is `false` by default,
+because forgetting a variable should be harmless rather than catastrophic.
 
 ---
 
@@ -234,174 +346,270 @@ http://localhost:8090/__admin/requests.
 cd frontend && npm install && npm run dev
 ```
 
-http://localhost:5173, com o Order Service e o Notification Service de pé. O Vite
-faz proxy de `/api/v1/tickets` para `localhost:8083` e do resto de `/api` para
-`localhost:8081` — em produção o front seria servido do mesmo domínio, e abrir CORS
-só para desenvolvimento é configuração que vaza para produção por esquecimento.
+React 18, TypeScript in strict mode, Vite. **No runtime dependency beyond `react` and
+`react-dom`** — the router, the cart, the theme system and the Stripe and Google
+integrations are about sixty lines each, and a package for any of them would cost more
+attention than it saves.
 
-Sete telas, com URL de verdade: home, descobrir com filtros, evento, checkout,
-pedido, meus pedidos e identificação. A tela do pedido existe para tornar visível a
-premissa do projeto — o status começa em **aguardando pagamento** e muda sozinho,
-sem nada na tela ter ficado bloqueado esperando o gateway.
+Seven routes with real URLs: home, discover, event, checkout, order, my orders, sign in.
 
-Tema claro e escuro, com um terceiro estado que segue o sistema. Sem ele, quem
-escolheu uma vez fica preso na escolha — e quase ninguém volta ao botão para
-corrigir.
+- **A design system in CSS custom properties.** Every colour comes from
+  `styles/tokens.css`; no component writes a hex value.
+- **Three-state theming** — light, dark, and *system*. Without the third, whoever chose
+  once is stuck with that choice, and almost nobody returns to fix it.
+- **Event posters are drawn from the event id.** The catalogue has no images, and
+  adding an `imageUrl` field to the contract just to make the frontend prettier would be
+  the tail wagging the dog. Each event gets a stable SVG instead of a grey rectangle.
+- **Polling, not WebSocket**, because that is what the contract defines: `POST` answers
+  `202` and the client polls. It stops on its own once the order reaches a final state.
 
-Detalhes que valem reparar:
+The order page exists to make the premise visible: the status starts at *awaiting
+payment* and changes by itself, with nothing on screen ever having blocked on the
+gateway.
 
-- **O catálogo é público, comprar exige login.** A API tira quem você é do `sub` do
-  token; o corpo da requisição não tem campo de cliente para ser adulterado.
-- **Nenhum dado de cartão é coletado.** Não é simplificação: o Payment Service fala
-  com um gateway simulado, e mesmo em produção só bandeira e últimos quatro dígitos
-  seriam guardados. Um formulário de cartão que não vai a lugar nenhum seria teatro.
-- **O pôster de cada evento é desenhado a partir do id.** O catálogo não tem imagem,
-  e criar um campo no contrato só para o front ficar bonito seria o rabo abanando o
-  cachorro — cada evento ganha um SVG estável em vez de um retângulo cinza.
-- **Polling, não WebSocket**, porque é o que o contrato define: o `POST` responde
-  `202` e o cliente consulta o pedido. Push exigiria SSE no Order Service, e está
-  anotado como próximo passo em vez de simulado. O polling para sozinho quando o
-  pedido chega a um estado final.
-
-Detalhes de arquitetura do front em [docs/04-frontend.md](docs/04-frontend.md); o
-que ainda não existe está em [docs/05-roadmap-produto.md](docs/05-roadmap-produto.md).
+More in [docs/04-frontend.md](docs/04-frontend.md).
 
 ---
 
-## Observabilidade
+## Observability
 
 ```bash
 docker compose --profile apps --profile observability up -d
 ```
 
-Grafana em http://localhost:3002 já sobe com o datasource e o dashboard
-**TicketFlow — visão geral** provisionados. Sem login, sem clicar em nada.
+Grafana at http://localhost:3002 comes up with the datasource and the **TicketFlow —
+visão geral** dashboard provisioned. No login, nothing to click.
 
-O dashboard responde a perguntas que só existem porque o sistema é assíncrono:
+Eleven panels, each answering a question that only exists because the system is
+asynchronous:
 
-- **Backlog do outbox** — o número mais útil do sistema. Se `PENDING` sobe, o relay
-  parou ou o broker sumiu, e a API continua respondendo `202` alegremente enquanto
-  ninguém a jusante fica sabendo. É uma falha invisível pela API.
-- **Resultado das cobranças** — aprovado e recusado são respostas do gateway;
-  `TIMEOUT` e `ERROR` não são, e são o par que sobe primeiro quando o provedor
-  começa a falhar.
-- **Latência do gateway** — o `read-timeout` é 5s; quando o p99 encosta nele, os
-  timeouts começam.
-- **Latência do `POST /orders`** — tem que ser baixa justamente porque não espera o
-  pagamento. Se subir, a premissa do projeto está sendo violada em algum lugar.
+| Panel | The question it answers |
+|---|---|
+| Order funnel | accepted → published → consumed → charged. **Which step did it stop at?** |
+| Consumer lag | Is everything actually being processed? |
+| Outbox backlog | Did the relay stop while the API kept answering `202`? |
+| Oldest pending message | Is this a traffic spike or an incident? |
+| Charge outcomes | `TIMEOUT` and `ERROR` rise first when a provider starts failing |
+| Gateway latency (p95/p99) | The read timeout is 5s — when p99 approaches it, timeouts begin |
+| Webhook outcomes | Is the provider's answer getting in, or being refused? |
+| `POST /orders` latency | It must stay low precisely because it does not wait for payment |
 
-As métricas de negócio são registradas na infraestrutura, nunca nos casos de uso —
-`OutboxMetrics` e o timer no cliente do gateway. O domínio não sabe que Prometheus
-existe.
+Two of these were built after debugging production by hand. The funnel is literally the
+reasoning used to prove an order had crossed Kafka — scraping `/actuator/prometheus`
+and comparing counters. The oldest-pending gauge exists because counts mislead: fifty
+messages two seconds old is traffic, one message ten minutes old is an incident, and
+both look identical on a quantity graph.
+
+Business metrics are registered in the infrastructure layer, never in use cases. The
+domain does not know Prometheus exists.
 
 ---
 
-## Payment Service
+## CI/CD
 
-Um worker sem API pública. Consome `ORDER_CREATED`, cobra pelo gateway externo e
-publica `PAGAMENTO_APROVADO` ou `PAGAMENTO_RECUSADO`. É o único serviço que faz HTTP
-de saída — e só para o gateway.
+**GitHub Actions.** There is no Jenkins in this project — the pipeline lives in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) and runs on every push and pull
+request, with in-progress runs cancelled when a new commit arrives.
+
+Four jobs:
+
+| Job | What it does |
+|---|---|
+| **services** | Matrix over the three services: `./mvnw verify` on JDK 21 with dependency caching, uploading test reports as artifacts |
+| **secrets** | Scans the **entire git history** for credential formats, with `fetch-depth: 0` |
+| **contracts** | Lints the OpenAPI document with Redocly and validates the event JSON Schemas |
+| **images** | Builds the three Docker images with Buildx |
+
+A second workflow, [`keep-awake.yml`](.github/workflows/keep-awake.yml), pings the
+deployed services on a schedule. It exists because of a real constraint documented
+below, not as decoration.
+
+---
+
+## Kubernetes
+
+Manifests live in [`infra/k8s/`](infra/k8s/) and describe the same three services for a
+cluster:
+
+| File | Contents |
+|---|---|
+| `00-namespace.yaml` | `ticketflow` namespace |
+| `01-config.yaml` | `ConfigMap` for configuration, `Secret` for credentials |
+| `10/11/12-*.yaml` | One `Deployment` + `Service` per microservice |
+
+Each Deployment runs **2 replicas** with requests of `200m` CPU / `512Mi` and a
+`768Mi` limit, liveness and readiness probes on the Actuator endpoints, and all
+configuration injected from the ConfigMap and Secret — no defaults baked into the image.
+
+Two replicas is not a decoration: it is what the outbox relay's `FOR UPDATE SKIP LOCKED`
+was written for, and what makes the consumer-group partition assignment meaningful.
+
+The `kubernetes` Spring profile has **no default values** for anything, on purpose. A
+missing variable must break the boot loudly rather than silently connect to something
+unintended.
+
+> These manifests are written and reviewed but the deployed environment runs on Render,
+> which is a container platform rather than a Kubernetes cluster. Applying them requires
+> a cluster and a registry; the notes are in [`infra/k8s/README.md`](infra/k8s/README.md).
+
+---
+
+## Cloud deployment
+
+| Piece | Provider | Notes |
+|---|---|---|
+| Frontend | **Vercel** | Rewrites route `/api/v1/tickets` to Notification, `/api/v1/payments` to Payment, the rest to Order |
+| Services | **Render** | Blueprint in [`render.yaml`](render.yaml), Docker runtime, health checks on readiness |
+| Orders DB | **Supabase** | Session pooler — the direct connection is IPv6-only |
+| Payments DB | **Neon** | Separate provider, because database-per-service is the point |
+| Tickets DB | **MongoDB Atlas** | M0 |
+| Kafka | **Redpanda Cloud** | SASL_SSL + SCRAM-SHA-256, with per-topic and per-group ACLs |
+
+No secret lives in this repository. Everything sensitive is `sync: false` in the
+blueprint, which makes Render ask for it and keep it in its own panel.
+
+Three constraints shaped this setup, and they are worth stating because they are the
+kind of thing that only shows up when you actually deploy:
+
+- **Free instances sleep.** Payment and Notification are Kafka consumers — nobody makes
+  HTTP requests to them, so without the scheduled ping they would never wake, and an
+  order would sit `PENDING` forever while the site looked fine.
+- **Connection ceilings are low.** Supabase's free pooler accepts 15 connections; a pool
+  of 10 per instance means the second instance to start cannot open its pool and dies
+  during Flyway. The pool is capped at 5.
+- **Environments must not share a consumer group.** With one broker for local and
+  deployed, Kafka splits partitions between them and half the orders are processed by
+  the wrong environment — with no error anywhere. Groups carry an environment suffix.
+
+---
+
+## Running locally
+
+Only Docker is required for the infrastructure; JDK 21 to run the services from source.
 
 ```bash
-cd services/payment-service && ./mvnw verify
+docker compose up -d
 ```
 
-Duas ideias sustentam o serviço:
+Brings up PostgreSQL, MongoDB and Kafka, applies migrations, creates topics and opens
+the Kafka UI.
 
-- **Uma `PaymentStrategy` por método.** Adicionar um método significa escrever uma
-  implementação nova; nenhum arquivo existente muda de comportamento. O registry se
-  recusa a subir se algum método ficar sem estratégia — erro no boot, não na compra
-  de um cliente. É também a estratégia que decide se um timeout pode ser retentado:
-  cartão e PIX sim, boleto não, porque geraria um segundo boleto.
-- **Recusa e falha não são a mesma coisa.** `REJECTED` é o gateway dizendo não, e
-  publica `PAGAMENTO_RECUSADO`. `FAILED` é timeout ou 5xx: **não publica nada**, não
-  grava no inbox e deixa a mensagem ser reentregue. Ninguém sabe se o dinheiro se
-  moveu, e dizer ao cliente que o cartão foi negado seria mentira.
-
-Os testes com Wiremock cobrem os quatro cenários — aprovado, recusado, timeout e
-5xx — porque caminho feliz sozinho não é cobertura. O gateway simulado do ambiente
-local está documentado em [`infra/wiremock/`](infra/wiremock/README.md).
-
----
-
-## Estrutura
-
-```
-ticketflow/
-├── contracts/
-│   ├── openapi/          contrato REST do Order Service
-│   └── events/           JSON Schema dos eventos Kafka
-├── docs/                 arquitetura, modelagem, eventos
-├── infra/
-│   ├── postgres/init/    criação dos databases
-│   ├── mongo/init/       coleções, validadores e índices
-│   └── kafka/            criação dos tópicos
-├── services/
-│   ├── order-service/    API REST — implementado
-│   ├── payment-service/  worker   — implementado
-│   └── notification-service/      — a fazer
-└── docker-compose.yml
+```bash
+docker compose --profile apps up -d --build
 ```
 
-Cada serviço é um projeto Maven independente, com seu próprio `pom.xml` e `mvnw`.
-Não há parent pom nem módulo de eventos compartilhado: acoplar os três em tempo de
-compilação anularia boa parte do sentido de separá-los em tempo de execução.
+Adds the three services and the simulated payment gateway.
+
+| Service | Address | Credentials |
+|---|---|---|
+| PostgreSQL | `localhost:5433` | `ticketflow` / `ticketflow` |
+| MongoDB | `localhost:27017` | `root` / `root` |
+| Kafka | `localhost:9092` | — |
+| Kafka UI | http://localhost:8085 | — |
+| Prometheus | http://localhost:9091 | profile `observability` |
+| Grafana | http://localhost:3002 | profile `observability`, opens straight in |
+
+> **PostgreSQL is on 5433, not 5432**, because 5432 is usually taken by a native
+> install. Inside the Docker network it is still `postgres:5432`.
+
+These are local development credentials and are good for nothing else.
+
+### Seeing the whole system work
+
+The simulated gateway refuses any charge above 2000, so both branches of the flow are
+reachable without configuring anything: a cheap order is approved, an expensive one is
+declined, and the inventory settles differently in each case.
+
+Raw messages are visible in the [Kafka UI](http://localhost:8085); what the Payment
+Service sent to the gateway, including the idempotency key, at
+http://localhost:8090/__admin/requests.
 
 ---
 
-## Roadmap
+## Testing strategy
 
-### Fase 1 — Fundação e modelagem ✅
+**174 tests.** Surefire runs `*Test` (fast, no Docker); Failsafe runs `*IT`.
 
-- [x] Contrato OpenAPI do Order Service
-- [x] Schemas dos eventos Kafka (envelope + payloads)
-- [x] Modelagem PostgreSQL dos dois serviços, com Flyway
-- [x] Modelagem MongoDB com validadores e índices
-- [x] docker-compose com Postgres + Mongo + Kafka de pé
+| Service | Unit | Integration |
+|---|---|---|
+| Order | 79 | `*IT` with EmbeddedKafka and a real PostgreSQL |
+| Payment | 72 | `*IT` with EmbeddedKafka and WireMock |
+| Notification | 23 | `*IT` with EmbeddedKafka and MongoDB |
 
-### Fase 2 — Backend em Clean Architecture
+Principles the suite holds to:
 
-- [x] Order Service com Spring Boot e TDD — domínio, casos de uso, REST e outbox
-- [x] Spring Cloud Stream ligando o Order Service ao Kafka
-- [x] Relay do outbox, publicando com `FOR UPDATE SKIP LOCKED`
-- [x] Consumo do resultado do pagamento, idempotente
-- [x] Payment Service, com Strategy por método de pagamento
-- [x] Testes com Wiremock: aprovado, recusado, timeout, 5xx
-- [ ] Notification Service gravando ingresso no MongoDB
-
-### Fase 3 — Observabilidade e nuvem
-
-- [x] Actuator + Micrometer nos três serviços, com métricas de negócio
-- [x] Prometheus e Grafana no compose, com dashboard provisionado
-- [x] Manifestos Kubernetes (Deployment + Service por microsserviço)
-- [x] LocalStack com S3 arquivando os ingressos emitidos
-
-### Fase 4 — CI/CD e frontend
-
-- [x] Pipeline: build Maven, testes, lint dos contratos, imagem Docker
-- [x] Telas React: lista de eventos e acompanhamento do pedido
+- **Every use case has a unit test** with plain fakes — no Spring context, no Docker.
+- **Every external integration is tested for success, decline, timeout and 5xx.** The
+  happy path alone does not count as covered.
+- **Messaging is tested with EmbeddedKafka, not Testcontainers**, so the suite runs on a
+  machine without a working Docker socket and in CI without a service container.
+- Some tests exist to stop a specific disaster from recurring: the pinned identity
+  vector across three services, the boot-time refusal of an unsafe auth configuration,
+  and the assertion that a webhook without an `aud` claim is refused rather than
+  crashing.
 
 ---
 
-## Ferramentas
+## Engineering decisions worth reading
 
-- **JDK 21** (Temurin). Se `java -version` mostrar Java 8, o PATH está apontando
-  para o JRE antigo — aponte `JAVA_HOME` para o JDK 21 antes de buildar.
-- **Maven não precisa ser instalado**: cada serviço traz o Maven Wrapper (`mvnw`),
-  que baixa a versão certa sozinho.
-- **Docker Desktop**, para a infraestrutura.
+A few choices that are easy to get wrong and were deliberate here.
+
+**`UnitOfWork` instead of `@Transactional` on the use case.** The order insert and the
+outbox insert need the same transaction, but annotating the use case would couple it to
+Spring. The port is implemented with `TransactionTemplate` in the infrastructure layer,
+and the unit test injects a version that simply runs the block.
+
+**Idempotency by constraint, not by a prior `SELECT`.** The `SELECT` is an
+optimisation; `uq_orders_idempotency_key` is the guarantee. If two requests with the
+same key race, the loser reloads the winner's order and returns `200`. There is a test
+for that race.
+
+**`@Scheduled` and `@Transactional` are never on the same class.** The timer would call
+the method on `this` and bypass the proxy. The relay broke exactly that way, with "no
+transaction is known to be in progress", and only showed up when running for real. The
+trigger lives in its own bean.
+
+**One file per Spring Data repository interface.** Grouping several as nested interfaces
+makes the scan miss them, and the error surfaces only at boot as "No qualifying bean".
+
+**Not-yours and not-found answer the same.** Asking for another customer's order
+returns the same response as asking for one that does not exist. A `403` would confirm
+the order's existence to whoever is probing ids, and the mere fact that an order exists
+is already someone else's information.
 
 ---
 
-## Dívidas conhecidas
+## Known limits
 
-Anotadas para não parecerem esquecimento:
+Recorded so they do not look like oversights.
 
-- As tabelas `processed_events` no Postgres crescem sem limite. A do MongoDB já tem
-  TTL de 30 dias; as do Postgres precisam de uma limpeza agendada.
-- O relay do outbox ainda não existe (fase 2). Sem ele, nada é publicado no Kafka.
-- O provedor de identidade é simulado. O Order Service valida JWT como resource
-  server, mas os tokens saem de um endpoint de desenvolvimento que não verifica
-  senha. Trocar por um provedor real é substituir um bean por `issuer-uri`.
-- `ticket_categories` tem contadores de estoque, mas a reserva efetiva no momento do
-  pedido é trabalho da fase 2.
+- **Card payments require the browser.** PIX and boleto settle through the webhook;
+  card needs Stripe Elements, which is implemented, but there is no server-side
+  fallback for a customer who closes the page mid-confirmation.
+- **There is no order cancellation.** The domain has `Order.cancel(...)` and `CANCELLED`
+  is a legitimate terminal state, but nothing reaches it — orders only leave `PENDING`
+  through payment, decline, or the expiry job. Implementing it properly means handling
+  the race where a cancellation and an approval cross, which is a compensation problem
+  (refund), not a locking one.
+- **`processed_events` grows without bound in PostgreSQL.** The MongoDB one already has
+  a 30-day TTL; the relational ones need a scheduled cleanup.
+- **The catalogue has no administrative path.** Events are seeded locally and were
+  inserted by hand in the deployed environment.
+- **Redpanda Cloud is on trial credit**, not a permanent free tier.
+
+Product roadmap and what is deliberately out of scope:
+[docs/05-roadmap-produto.md](docs/05-roadmap-produto.md).
+
+---
+
+## Documentation
+
+- [Architecture](docs/01-arquitetura.md) — why Kafka, why an outbox, why two databases
+- [Data modelling](docs/02-modelagem-dados.md) — the tables, the collections, the reasoning
+- [Kafka events](docs/03-eventos-kafka.md) — topics, envelope, retry, DLQ
+- [Frontend](docs/04-frontend.md) — design system, theming, screen decisions
+- [Product roadmap](docs/05-roadmap-produto.md) — what does not exist yet, and what stays out
+- [API contract](contracts/openapi/order-service.yaml) — OpenAPI 3.0
+
+> Documentation under `docs/` is written in Portuguese; code, identifiers, table names,
+> routes and JSON fields are in English.
