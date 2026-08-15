@@ -1,162 +1,190 @@
 # CLAUDE.md
 
-Contexto para sessões futuras neste repositório. Ler antes de gerar código.
+Context for future sessions in this repository. Read before generating code.
 
-## O que é
+## What this is
 
-TicketFlow — sistema distribuído de venda de ingressos, projeto de portfólio. Cada
-decisão técnica existe para demonstrar uma competência específica. Se uma solução
-mais simples resolveria o problema mas esconderia a competência, prefira a que
-mantém a competência visível.
+TicketFlow — a distributed ticket-selling system, built as a portfolio project. Every
+technical decision exists to demonstrate a specific competency. If a simpler solution
+would solve the problem but hide the competency, prefer the one that keeps the
+competency visible.
 
-Detalhes em [README.md](README.md) e [docs/](docs/).
+Details in [README.md](README.md) and [docs/](docs/).
 
-## A regra que não se quebra
+## The rule that is never broken
 
-**Nenhuma chamada síncrona entre Order, Payment e Notification Service.** Eles se
-comunicam exclusivamente por eventos Kafka. Se aparecer um `RestTemplate`,
-`WebClient` ou `FeignClient` apontando de um serviço para outro, é bug de
-arquitetura — o único HTTP de saída permitido é o Payment Service chamando o
-gateway externo.
+**No synchronous call between Order, Payment and Notification.** They communicate
+exclusively through Kafka events. If a `RestTemplate`, `WebClient` or `FeignClient`
+ever points from one service to another, that is an architecture bug — the only
+permitted outbound HTTP is the Payment Service calling the external gateway.
 
-## Idioma
+**The browser is not a service.** It talks to all three directly, and that does not
+break the rule. This is how Stripe Elements gets the `client_secret`: it is born in
+the Payment Service, and the browser fetches it from there. Routing it through the
+Order Service would have required either service-to-service HTTP or shipping a payment
+credential through a Kafka topic into another service's database.
 
-- **Código, identificadores, comentários em código, nomes de tabela, rotas e campos
-  JSON: inglês.** `Order`, `Payment`, `orders`, `/api/v1/orders`, `customerId`.
-- **Documentação (`docs/`, README): português.**
-- **Exceção única:** os tipos de evento `PAGAMENTO_APROVADO` e `PAGAMENTO_RECUSADO`
-  são vocabulário fixo do projeto e ficam em português. Não criar sinônimos nem
-  traduzir.
+## Language
 
-## Convenções de código
+- **Code, identifiers, table names, routes and JSON fields: English.** `Order`,
+  `Payment`, `orders`, `/api/v1/orders`, `customerId`.
+- **Code comments and Javadoc: Portuguese.** Some older backend code is in English;
+  do not translate it just to be consistent, but write new comments in Portuguese —
+  that is what the codebase reads like today.
+- **`README.md`: English.** It is the front door of a public portfolio.
+- **`docs/`: Portuguese.**
+- **Single exception:** the event types `PAGAMENTO_APROVADO` and `PAGAMENTO_RECUSADO`
+  are fixed project vocabulary and stay in Portuguese. Do not create synonyms or
+  translate them.
 
-**Clean Architecture.** UseCase não conhece Spring, JPA nem Kafka. Recebe e devolve
-objeto de domínio. Controller, repositório, cliente HTTP e binding de Kafka são
-infraestrutura e ficam fora do caso de uso.
+## Code conventions
 
-**SOLID de verdade.** Método de pagamento novo entra como uma `PaymentStrategy`
-nova, não como mais um ramo de `if/else`. Injeção por construtor, nunca
-`@Autowired` em campo.
+**Clean Architecture.** A use case knows nothing about Spring, JPA or Kafka. It takes
+and returns domain objects. Controllers, repositories, HTTP clients and Kafka bindings
+are infrastructure and live outside the use case.
 
-**Testes.** Todo UseCase tem teste unitário (JUnit + Mockito). Toda integração
-externa tem teste com Wiremock cobrindo sucesso, recusa, timeout e 5xx — caminho
-feliz sozinho não conta como coberto.
+**Real SOLID.** A new payment method arrives as a new `PaymentStrategy`, not as another
+branch in an `if/else`. Constructor injection, never `@Autowired` on a field.
 
-**Idempotência.** Todo consumidor Kafka checa `processed_events` antes de agir.
-Entrega é at-least-once; assumir exactly-once é defeito.
+**Tests.** Every use case has a unit test (JUnit + Mockito). Every external integration
+has a WireMock test covering success, decline, timeout and 5xx — the happy path alone
+does not count as covered.
 
-**Publicação de evento.** Sempre pelo outbox, na mesma transação da escrita de
-negócio. Nunca `kafkaTemplate.send()` direto de dentro de um UseCase.
+**Idempotency.** Every Kafka consumer checks `processed_events` before acting. Delivery
+is at-least-once; assuming exactly-once is a defect.
 
-**Bancos.** Dado transacional → PostgreSQL. Documento/histórico → MongoDB. Não
-force uma entidade transacional para o Mongo só porque já existe código Mongo por
-perto.
+**Publishing events.** Always through the outbox, in the same transaction as the
+business write. Never `kafkaTemplate.send()` from inside a use case.
 
-**Dinheiro.** `BigDecimal` no Java, `NUMERIC(12,2)` no Postgres. Nunca `double`.
+**Databases.** Transactional data → PostgreSQL. Documents and history → MongoDB. Do not
+force a transactional entity into Mongo just because there is Mongo code nearby.
 
-**Dados de cartão.** Não persistir, não logar, não publicar em evento. Só bandeira
-e últimos 4 dígitos.
+**Money.** `BigDecimal` in Java, `NUMERIC(12,2)` in PostgreSQL. Never `double`.
 
-## Ao gerar código
+**Card data.** Never persisted, never logged, never published in an event. Only the
+brand and the last four digits.
 
-Explique brevemente onde a peça se encaixa: qual serviço, qual evento produz ou
-consome, qual banco toca. O projeto tem objetivo pedagógico e essa amarração é
-parte da entrega.
+## When generating code
 
-## Ao revisar código
+Briefly explain where the piece fits: which service, which event it produces or
+consumes, which database it touches. The project is pedagogical and that connection is
+part of the deliverable.
 
-Além de bugs, apontar: UseCase acoplado a framework, `if/else` onde cabia Strategy,
-teste que só cobre caminho feliz, consumidor sem checagem de idempotência,
-publicação fora do outbox.
+## When reviewing code
 
-## Ambiente local
+Beyond bugs, call out: a use case coupled to a framework, an `if/else` where a Strategy
+belongs, a test that only covers the happy path, a consumer without an idempotency
+check, and publishing outside the outbox.
 
-- Windows. Terminal padrão é PowerShell 5.1 — sem `&&`, sem operador ternário.
-- Postgres do projeto no host é **5433** (a 5432 é de uma instalação nativa que já
-  existe na máquina). Dentro da rede Docker continua `postgres:5432`.
-- **JDK 21 está em `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`, mas o
-  PATH aponta para um JRE 8.** Antes de qualquer build:
+## Local environment
+
+- Windows. The default terminal is PowerShell 5.1 — no `&&`, no ternary operator.
+- The project's PostgreSQL is on **5433** on the host (5432 belongs to a native install
+  that already exists on this machine). Inside the Docker network it is still
+  `postgres:5432`.
+- **JDK 21 lives at `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`, but PATH
+  points at a JRE 8.** Before any build:
   `$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot"`.
-  Maven não está instalado e não precisa estar — use `.\mvnw.cmd`.
-- **O Docker aqui é o Rancher Desktop**, não Docker Desktop (`docker.exe` vem de
-  `C:\Program Files\Rancher Desktop\...`). Se o `docker` não responder, é porque o
-  Rancher Desktop não está aberto — ele precisa ser iniciado pela interface.
-- **Testcontainers não consegue falar com o Docker nesta máquina.** Todos os named
-  pipes devolvem um `/info` vazio para clientes JVM, embora o `docker` CLI funcione —
-  é uma incompatibilidade do Rancher Desktop com o docker-java.
-  Rodar os testes de integração assim:
+  Maven is not installed and does not need to be — use `.\mvnw.cmd`.
+- **Docker here is Rancher Desktop**, not Docker Desktop (`docker.exe` comes from
+  `C:\Program Files\Rancher Desktop\...`). If `docker` does not respond, Rancher Desktop
+  is not running — it has to be started from its interface.
+- **Testcontainers cannot talk to Docker on this machine.** Every named pipe returns an
+  empty `/info` to JVM clients even though the `docker` CLI works — an incompatibility
+  between Rancher Desktop and docker-java. Run the integration tests like this:
   `.\mvnw.cmd verify "-Dticketflow.it.datasource.url=jdbc:postgresql://localhost:5433/ticketflow_orders_it"`.
-  Esse banco é apagado a cada teste — nunca apontar para `ticketflow_orders`.
-  No Notification Service o equivalente é o Mongo, e a credencial **precisa ser a
-  root**: o usuário `ticketflow` só tem permissão no banco de demonstração, e
-  apontar para o `_it` com ele falha com `not authorized`, não com erro de conexão.
+  That database is wiped on every test — never point it at `ticketflow_orders`.
+  In the Notification Service the equivalent is Mongo, and the credential **must be
+  root**: the `ticketflow` user only has rights on the demo database, and pointing it at
+  the `_it` one fails with `not authorized`, not with a connection error.
   `.\mvnw.cmd verify "-Dticketflow.it.mongo.uri=mongodb://root:root@localhost:27017/ticketflow_notifications_it?authSource=admin"`
-- Migrations rodam via container Flyway no compose e também no boot da aplicação.
-  Os arquivos vivem em `src/main/resources/db/migration` de cada serviço.
+- Migrations run through the Flyway container in compose and also at application boot.
+  The files live in `src/main/resources/db/migration` of each service.
 
-## Padrões já estabelecidos pelo Order Service
+## Patterns already established
 
-Os outros dois serviços devem copiar estas escolhas, não reinventá-las:
+The other services copy these choices rather than reinventing them.
 
-- Projeto Maven independente, sem parent pom e sem módulo de eventos compartilhado.
-- Pacotes `domain` / `application` / `infrastructure`, com dependência só para
-  dentro. Casos de uso são classes simples, montadas em `UseCaseConfiguration` —
-  nada de `@Service` na camada de aplicação.
-- Transação via porta `UnitOfWork`, nunca `@Transactional` no caso de uso.
-- Erros de domínio herdam de `DomainException` com um `code` estável; o
-  `GlobalExceptionHandler` traduz código → status HTTP e devolve `ProblemDetail`.
-- Surefire roda `*Test` (rápidos, sem Docker); Failsafe roda `*IT`.
-- Sem Lombok. Records para DTOs, classes escritas à mão para o domínio.
-- Kafka via Spring Cloud Stream: `StreamBridge` para publicar (o relay envia quando
-  tem o que enviar), bean `Consumer<Message<String>>` para consumir. O parsing do
-  envelope JSON fica no listener, nunca no caso de uso.
-- Testes de mensageria com **EmbeddedKafka**, não Testcontainers — sem Docker,
-  rodam aqui e na CI. Os `*IT` herdam de `support/OrderServiceIT`, que já cuida do
-  banco e do catálogo.
-- **`@Scheduled` e `@Transactional` nunca na mesma classe.** O timer chamaria o
-  método em `this` e passaria por fora do proxy — o relay quebrou exatamente assim,
-  com "no transaction is known to be in progress", e só apareceu rodando de verdade.
-  O gatilho mora num bean separado.
-- **Um arquivo por interface de repositório Spring Data.** Agrupar várias como
-  interfaces aninhadas dentro de uma classe faz o scan não encontrá-las, e o erro só
-  aparece no boot como "No qualifying bean".
-- **Dentro de `await().untilAsserted()`, nunca `jdbc.queryForObject`.** Ele lança
-  `EmptyResultDataAccessException` quando não há linha, e o Awaitility só repete em
-  `AssertionError` — a espera aborta na primeira tentativa e o sintoma engana, parece
-  que o consumidor nunca rodou. Usar `queryForList` e devolver null.
-- **Flag perigosa tem padrão seguro, e segredo não tem padrão nenhum.**
-  `ticketflow.auth.dev-tokens` já valeu `true` na configuração base — subir para
-  qualquer lugar sem lembrar da variável deixava um emissor de identidade aberto na
-  internet, emitindo token para qualquer e-mail sem senha. Hoje o padrão é `false`
-  e os perfis `local` e `docker` ligam explicitamente. `ticketflow.auth.secret` não
-  tem padrão fora desses dois perfis: variável ausente derruba o boot, porque um
-  ambiente rodando com a chave de exemplo publicada aqui aceita token forjado.
-- **Com provedor externo, `audience` é obrigatório junto com `issuer-uri`.**
-  Assinatura válida e emissor correto provam que o Google emitiu o token — não que
-  ele foi emitido para nós. Um token legítimo de qualquer outro aplicativo do Google
-  traz o mesmo `iss` e o mesmo `sub` da pessoa, e sem comparar o `aud` ele entra
-  como login válido. Os dois serviços derrubam o boot se vier issuer sem audience,
-  e `JwtDecoderSelectionTest` trava isso nos dois lados. No Render, uma variável
-  `sync: false` **não é criada** numa sincronização automática do blueprint: ela
-  nasce ausente e o deploy falha até alguém preencher no painel — é o
-  comportamento desejado, mas conte com um deploy vermelho ao adicionar uma.
-- **A identidade do cliente é derivada do token, não é o `sub` cru.** O domínio usa
-  UUID; provedor de identidade não é obrigado a usar — o Google devolve um número.
-  `AuthenticatedCustomer.customerId` e o `CustomerIdentity` do Notification Service
-  aplicam a **mesma** regra (`sub` que já é UUID passa direto; senão deriva de
-  `issuer|sub`). Divergir entre os dois faz o Order gravar com um id e o
-  Notification buscar com outro: o ingresso some da tela sem erro em lugar nenhum.
-  Os dois lados têm um teste com o mesmo vetor fixo justamente para isso quebrar o
+- Independent Maven project, no parent POM, no shared events module.
+- Packages `domain` / `application` / `infrastructure`, with dependencies pointing only
+  inwards. Use cases are plain classes assembled in a configuration class — no
+  `@Service` in the application layer.
+- Transactions through a `UnitOfWork` port, never `@Transactional` on a use case.
+- Domain errors extend `DomainException` with a stable `code`; the
+  `GlobalExceptionHandler` translates code → HTTP status and returns a `ProblemDetail`.
+- Surefire runs `*Test` (fast, no Docker); Failsafe runs `*IT`.
+- No Lombok. Records for DTOs, hand-written classes for the domain.
+- Kafka through Spring Cloud Stream: `StreamBridge` to publish (the relay sends when it
+  has something to send), a `Consumer<Message<String>>` bean to consume. Parsing the
+  JSON envelope belongs to the listener, never to the use case.
+- Messaging tests use **EmbeddedKafka**, not Testcontainers — no Docker, so they run
+  here and in CI. The `*IT` classes extend a support base that already handles the
+  database and the catalogue.
+- **`@Scheduled` and `@Transactional` never on the same class.** The timer would call
+  the method on `this` and bypass the proxy — the relay broke exactly that way, with
+  "no transaction is known to be in progress", and it only showed up running for real.
+  The trigger lives in its own bean.
+- **One file per Spring Data repository interface.** Grouping several as nested
+  interfaces makes the scan miss them, and the error only appears at boot as "No
+  qualifying bean".
+- **Inside `await().untilAsserted()`, never `jdbc.queryForObject`.** It throws
+  `EmptyResultDataAccessException` when there is no row, and Awaitility only retries on
+  `AssertionError` — the wait aborts on the first attempt and the symptom lies, looking
+  as if the consumer never ran. Use `queryForList` and return null.
+- **A dangerous flag defaults to safe, and a secret has no default at all.**
+  `ticketflow.auth.dev-tokens` was once `true` in the base configuration — deploying
+  anywhere without remembering the variable left an identity issuer open on the
+  internet, handing out tokens for any email without a password. Today the default is
+  `false` and only the `local` and `docker` profiles turn it on.
+- **With an external provider, `audience` is mandatory alongside `issuer-uri`.** A valid
+  signature and the right issuer prove Google issued the token — not that it was issued
+  for us. A legitimate token from any other Google application carries the same `iss`
+  and the same `sub` for that person, so without comparing `aud` it logs them in here.
+  All three services refuse to boot on issuer-without-audience, and
+  `JwtDecoderSelectionTest` locks that on every side.
+- **Customer identity is derived from the token, not the raw `sub`.** The domain uses
+  UUIDs; an identity provider is not obliged to — Google returns a number. All three
+  services apply the **same** rule (a `sub` that is already a UUID passes through,
+  otherwise the id comes from `issuer|sub`). Diverging makes one service write with one
+  id and another read with a different one: the ticket vanishes from the screen with no
+  error anywhere. All three have a test with the same pinned vector so this breaks the
   build.
-- **Recusa (`REJECTED`) e falha (`FAILED`) são coisas diferentes** e o Payment
-  Service depende disso: recusa publica `PAGAMENTO_RECUSADO`; timeout ou 5xx não
-  publicam nada, não gravam no inbox e deixam a mensagem ser reentregue. Nunca
-  transformar "o gateway não respondeu" em "o cartão foi negado".
+- **Decline (`REJECTED`), failure (`FAILED`) and accepted (`ACCEPTED`) are three
+  different things** and the Payment Service depends on it: a decline publishes
+  `PAGAMENTO_RECUSADO`; a timeout or 5xx publishes nothing, records nothing and lets the
+  message be redelivered; `ACCEPTED` means the provider took it and the answer comes by
+  webhook. Never turn "the gateway did not answer" into "the card was declined".
+- **Not-yours and not-found answer the same.** Asking for another customer's order or
+  charge returns exactly what a non-existent one returns. A `403` would confirm the
+  resource exists to whoever is probing ids.
+
+## Deployment traps that already cost a red deploy
+
+- **A `sync: false` variable is not created by an automatic blueprint sync.** Render has
+  nobody to ask for the value, so the variable is simply absent and the service fails to
+  boot. That is the desired behaviour — but expect a red deploy when adding one, until
+  it is filled in the panel.
+- **Vite inlines `VITE_*` at build time.** Adding the variable in the Vercel panel does
+  not change an already-published site; it needs a rebuild.
+- **Managed free databases have low connection ceilings.** Supabase's free pooler accepts
+  15; a pool of 10 per instance means the second instance to start dies during Flyway.
+  The cloud profiles cap the pool at 5.
+- **Environments must not share a Kafka consumer group.** With one broker for local and
+  deployed, Kafka splits the partitions between them and half the orders are processed by
+  the wrong environment, with no error anywhere. Groups carry `TICKETFLOW_GROUP_SUFFIX`.
+- **Micrometer does not publish histogram buckets by default**, so every
+  `histogram_quantile` in Grafana returns "No data" until
+  `management.metrics.distribution.percentiles-histogram.*` is enabled. A panel that
+  never has data is worse than no panel: it teaches people to ignore the dashboard.
 
 ## Roadmap
 
-Quatro fases, descritas no [README](README.md#roadmap). Fase 1 concluída; na fase 2
-o Order Service está pronto e testado, faltando o relay do outbox, o Payment Service
-e o Notification Service. Ao ser perguntado "o que vem agora", localizar a fase pelo
-que já existe no repositório e sugerir o próximo item **dessa** fase, sem pular para
-a seguinte.
+Four phases, described in the [README](README.md). Phases 1 through 4 are done: the
+three services, the frontend, observability, CI/CD, Kubernetes manifests, and a
+deployed environment on Render, Vercel, Supabase, Neon, Atlas and Redpanda, with Google
+sign-in and Stripe.
+
+When asked "what comes next", locate the phase from what already exists in the
+repository and suggest the next item **of that phase**, without jumping ahead. The
+current open items are listed under "Known limits" in the README — order cancellation
+with compensation is the most substantial one.
