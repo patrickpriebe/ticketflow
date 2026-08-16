@@ -10,7 +10,7 @@ Not "how do I wire Kafka to Spring Boot." That part is a tutorial. The interesti
 
 This article is the architecture, told through the defects that earned each piece of it.
 
-**The system:** three Spring Boot services that never call each other, two PostgreSQL databases and one MongoDB, six Kafka topics, a React frontend with no runtime dependencies beyond React, Stripe for real payments, Google for identity. 53 commits, ~17,000 lines of Java, 200 tests. It runs locally with one command and it's deployed.
+**The system:** three Spring Boot services that never call each other, two PostgreSQL databases and one MongoDB, six Kafka topics, a React frontend with no runtime dependencies beyond React, Stripe for real payments, Google for identity. 58 commits, ~17,000 lines of Java, 235 tests. It runs locally with one command and it's deployed.
 
 ![Order screen after payment: status paid, with the issued tickets and their codes](https://raw.githubusercontent.com/patrickpriebe/ticketflow/main/docs/img/07-order-paid.png)
 
@@ -126,11 +126,19 @@ Then it turns out the event can arrive at three different moments, and each one 
 
 **After the charge was approved.** Refund. This is the case the whole design exists for.
 
-**While the charge is in flight** — the nastiest one. The in-memory payment still says `PENDING`, the database row already says `CANCELLED`, and the money just left. Without handling it: the update hits the optimistic lock, the message is redelivered, the second delivery sees a settled payment and returns `ALREADY_SETTLED` without calling anyone.
+**While the charge is in flight** — the nastiest one. The in-memory payment still says `PENDING`, the database row already says `CANCELLED`, and the money just left. Without handling it, the stale object simply writes its own status over the row.
 
-**Nobody errors. Nothing appears in a dead-letter queue. The card stays charged for a cancelled order.** That's the worst kind of bug — one that produces no signal at all.
+I assumed the optimistic lock would catch that. It doesn't: `update` re-reads the entity inside its own transaction, so the version it compares is the one it just loaded. There is no conflict to detect. I only found out by slowing the gateway down on purpose and watching a timeout turn a `CANCELLED` payment into `FAILED` — and `FAILED` isn't terminal, so the protection that stops a cancelled order from being charged had been quietly erased.
 
-The fix re-reads the payment after the gateway answers and refunds on the spot, which works precisely because that code path is deliberately outside any transaction.
+**Nobody errors. Nothing appears in a dead-letter queue.** That's the worst kind of bug — one that produces no signal at all.
+
+The fix re-reads the payment after the gateway answers, refunds on the spot when the provider approved, and otherwise leaves the cancellation alone. It works precisely because that code path is deliberately outside any transaction.
+
+> An assumption about a framework's behaviour is still an assumption. This one was wrong, sat in a code comment explaining why the bug couldn't happen, and was only disproved by making the failure occur.
+
+That third case left a subtler trap behind. When a cancellation crosses a charge in flight, the money goes out and comes back — but the payment's status stays `CANCELLED`, because that is what happened to the *order*. So the screen that reports the outcome can't read the status: doing so tells someone who was charged that no charge was made. What settles it is the refund receipt, not the label.
+
+> When one field has to answer two different questions, it will answer one of them wrong.
 
 Which brings up something worth saying plainly: **the gateway call happens outside the transaction, on purpose.** Wrapping the whole flow in one transaction pins a database connection for the duration of an external call. That's the classic way a slow provider takes your database down with it.
 
@@ -206,9 +214,11 @@ state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
 
 **Prefer bugs that fail loudly.** Almost every defect here was dangerous in proportion to how quietly it failed. The routing bug, the in-flight cancellation, the empty Grafana panel — none of them threw. The ones that crashed were fixed in minutes.
 
-**Run it, don't just test it.** The QR bug, the missing refund endpoint and the DLQ partition mismatch were all invisible to unit tests and obvious within seconds of using the thing.
+**Run it, don't just test it.** The QR bug, the missing refund endpoint and the DLQ partition mismatch were all invisible to unit tests and obvious within seconds of using the thing. So was the one that embarrasses me most: my dev proxy routed **two** services while the deployed config routed **three**, so every call to the Payment Service fell through to the Order Service locally and answered `500`. It hid for weeks because the simulated gateway approves instantly and the screen that needed it barely renders.
 
-**Say what doesn't work.** My README has a *Known limits* section: no rate limiting, refunds aren't surfaced to the customer, the QR is decorative. A portfolio that claims to be finished is less credible than one that knows exactly where it stops.
+**Run the whole suite, not the fast half.** I kept running `mvnw test` — surefire only — and reporting green. The integration tests live behind `verify`, and one of them had been failing on *every push* since the day I hardened the security config: the boot guard I added refuses to start without a signing secret, and that test never passed one. The CI badge in my README was red and I hadn't looked.
+
+**Say what doesn't work.** My README has a *Known limits* section: no rate limiting, no e-mail when a refund goes through, the QR is decorative. A portfolio that claims to be finished is less credible than one that knows exactly where it stops.
 
 ---
 
