@@ -48,6 +48,8 @@ public class FindOrderPayment implements FindOrderPaymentUseCase {
                 payment.orderId(),
                 payment.method(),
                 payment.status(),
+                payment.amount(),
+                payment.wasRefunded(),
                 clientSecretFor(payment));
     }
 

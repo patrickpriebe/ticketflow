@@ -7,6 +7,7 @@ import { Stepper } from '../components/Stepper';
 import { TicketList } from '../components/TicketList';
 import { dateTime, money } from '../lib/format';
 import { linkProps } from '../lib/router';
+import { useRefundStatus } from '../useRefundStatus';
 
 interface Props {
   order: Order | null;
@@ -62,6 +63,15 @@ export function OrderPage({ order, error }: Props) {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const paid = order?.status === 'PAID';
+
+  // Só faz sentido perguntar pelo dinheiro depois que o pedido acabou sem
+  // pagamento. Antes disso a cobrança ainda é a do fluxo normal.
+  const cancelled = order?.status === 'CANCELLED';
+  const {
+    payment: refund,
+    pending: refundPending,
+    unknown: refundUnknown,
+  } = useRefundStatus(order?.id ?? null, cancelled);
 
   /**
    * Cancelar não pede confirmação por rigor de processo, e sim porque é
@@ -168,6 +178,40 @@ export function OrderPage({ order, error }: Props) {
             </div>
             <strong>{money(order.totalAmount)}</strong>
           </div>
+
+          {/* Cancelado sozinho não diz se alguém foi cobrado — e é a primeira
+              coisa que quem cancelou quer saber. Os três desfechos vêm do status
+              da cobrança, que mora no Payment Service. */}
+          {cancelled && (
+            <div className="refund-note">
+              <Icon name={refund?.refunded ? 'check' : 'clock'} size={16} />
+              <span>
+                {/* `refunded` vem antes do status de propósito: numa cobrança que
+                    cruzou o cancelamento em voo o dinheiro volta e o status fica
+                    CANCELLED, e olhar só o rótulo diria "nada foi cobrado" para
+                    quem foi cobrado. */}
+                {refundUnknown ? (
+                  <>Não foi possível confirmar agora o que houve com a cobrança.</>
+                ) : refund?.refunded ? (
+                  <>
+                    <strong>{money(refund.amount)}</strong> estornados para a forma de
+                    pagamento original. O prazo de aparecer na fatura é da operadora.
+                  </>
+                ) : !refund || refund.status === 'CANCELLED' ? (
+                  <>Nenhuma cobrança foi feita.</>
+                ) : refundPending ? (
+                  <>Processando o estorno de {money(refund.amount)}…</>
+                ) : (
+                  // Cobrança que ficou APPROVED sem virar estorno: o provedor
+                  // recusou a devolução. Dizer "estornado" aqui seria mentir.
+                  <>
+                    A cobrança de {money(refund.amount)} ainda consta como paga. Fale com
+                    o suporte informando o número do pedido.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
 
           {/* O relógio só importa enquanto o pagamento pode chegar. */}
           {order.status === 'PENDING' && order.expiresAt && (

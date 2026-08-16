@@ -16,6 +16,8 @@ import com.ticketflow.payment.domain.model.AttemptOutcome;
 import com.ticketflow.payment.domain.model.Payment;
 import com.ticketflow.payment.domain.model.PaymentAttempt;
 import com.ticketflow.payment.domain.model.PaymentStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +43,8 @@ import java.util.Objects;
  * only written at the very end.
  */
 public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(ProcessOrderPayment.class);
 
     private final PaymentRepository payments;
     private final PaymentGateway gateway;
@@ -94,19 +98,22 @@ public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
         // -------------------------------------------
 
         // O pedido pode ter sido cancelado enquanto a cobrança estava em voo. O
-        // `payment` em memória ainda diz PENDING, mas a linha no banco já é
-        // CANCELLED — e o dinheiro acabou de sair.
+        // `payment` em memória ainda diz PENDING; a linha no banco já é CANCELLED.
         //
-        // Sem este ramo o desfecho é o pior possível e silencioso: o `update`
-        // abaixo esbarra no lock otimista, a mensagem é reentregue, a segunda
-        // entrega encontra a cobrança já resolvida e devolve ALREADY_SETTLED sem
-        // chamar o provedor. Ninguém erra, ninguém reclama, e o cartão fica
-        // cobrado de um pedido cancelado.
+        // Vale para QUALQUER resposta do provedor, não só para a aprovação. O
+        // `update` mais abaixo recarrega a entidade e escreve o status que o
+        // objeto em memória calculou — ou seja, ele passa por cima do
+        // cancelamento sem o lock otimista notar, porque a versão que ele compara
+        // é a que acabou de ler. Foi assim que um timeout transformou uma
+        // cobrança CANCELLED em FAILED; e FAILED não é terminal, então a proteção
+        // que impede cobrar um pedido cancelado tinha sido apagada em silêncio.
         //
         // Estornar aqui é possível porque este ponto está fora de transação, que
         // é exatamente o que uma chamada externa exige.
-        if (response.outcome() == AttemptOutcome.APPROVED && cancelledMeanwhile(command)) {
-            return refundChargeForCancelledOrder(command, payment, response);
+        if (cancelledMeanwhile(command)) {
+            return response.outcome() == AttemptOutcome.APPROVED
+                    ? refundChargeForCancelledOrder(command, payment, response)
+                    : closeCancelledWithoutCharging(command, response);
         }
 
         Result result = unitOfWork.execute(() -> settle(command, payment, response, strategy));
@@ -124,6 +131,30 @@ public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
         return payments.findByOrderId(command.orderId())
                 .map(current -> current.status() == PaymentStatus.CANCELLED)
                 .orElse(false);
+    }
+
+    /**
+     * O pedido foi cancelado e o provedor não aprovou nada.
+     *
+     * <p>Recusa, timeout ou erro: em nenhum desses casos há dinheiro conhecido a
+     * devolver, e o pedido já acabou. A cobrança fica como está — {@code
+     * CANCELLED} —, e é justamente isso que precisa ser preservado: sobrescrever
+     * com {@code FAILED} devolveria a cobrança para um estado não-terminal, e uma
+     * reentrega do {@code ORDER_CREATED} voltaria a chamar o provedor.
+     *
+     * <p>O evento é marcado como processado mesmo num timeout, contrariando a
+     * regra geral de deixar reentregar. A regra existe para não perder uma
+     * cobrança que ainda vale; aqui ela não vale mais, e insistir seria tentar
+     * cobrar quem já desistiu.
+     */
+    private Result closeCancelledWithoutCharging(Command command, AuthorizationResponse response) {
+        log.warn("Pedido {} foi cancelado durante a cobranca; provedor respondeu {} e nada sera cobrado",
+                command.orderId(), response.outcome());
+
+        return unitOfWork.execute(() -> {
+            processedEvents.record(command.eventId());
+            return Result.ALREADY_SETTLED;
+        });
     }
 
     /**

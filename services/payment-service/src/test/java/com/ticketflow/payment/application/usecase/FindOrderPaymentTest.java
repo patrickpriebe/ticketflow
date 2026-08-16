@@ -8,6 +8,7 @@ import com.ticketflow.payment.domain.model.Money;
 import com.ticketflow.payment.domain.model.Payment;
 import com.ticketflow.payment.domain.model.PaymentAttempt;
 import com.ticketflow.payment.domain.model.PaymentMethod;
+import com.ticketflow.payment.domain.model.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,76 @@ class FindOrderPaymentTest {
 
         assertThat(view).isPresent();
         assertThat(view.get().clientSecret()).isEqualTo("pi_teste_123_secret_abc");
+    }
+
+    @Test
+    @DisplayName("o valor da cobranca sai junto, inclusive depois de estornada")
+    void ownerGetsTheAmount() {
+        // É o que permite a tela do pedido cancelado dizer quanto voltou. Sem o
+        // valor, ela só consegue dizer "estornado" — e aí a pessoa vai conferir a
+        // fatura para saber o que voltou, que é o trabalho que a tela existe para
+        // poupar.
+        Payment refunded = awaitingCard();
+        refunded.applyGatewayOutcome(attempt(2, AttemptOutcome.APPROVED),
+                "stripe", INTENT, null, null, CLOCK.instant());
+        refunded.markRefunded("re_teste_999", CLOCK.instant());
+
+        when(payments.findByOrderId(ORDER)).thenReturn(Optional.of(refunded));
+
+        Optional<View> view = useCase.execute(ORDER, OWNER);
+
+        assertThat(view).isPresent();
+        assertThat(view.get().amount().amount()).isEqualByComparingTo("120.00");
+        assertThat(view.get().amount().currency()).isEqualTo("BRL");
+        assertThat(view.get().status()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
+    @DisplayName("cobranca estornada durante a corrida aparece como estornada, apesar do status CANCELLED")
+    void refundedDuringRaceIsReportedAsRefunded() {
+        // O caso que o status sozinho nao conta. Quando o cancelamento cruza uma
+        // cobranca em voo, o dinheiro volta mas o status fica CANCELLED — porque
+        // foi isso que aconteceu com o PEDIDO. Perguntar so pelo status faria a
+        // tela dizer "nenhuma cobranca foi feita" para alguem que foi cobrado.
+        Payment payment = Payment.forOrder(ORDER, OWNER,
+                new Money(new BigDecimal("120.00"), "BRL"), PaymentMethod.CREDIT_CARD, CLOCK.instant());
+        payment.cancelBeforeCharge("Cancelled by the customer", CLOCK.instant());
+        payment.recordRefundOfCancelledOrder("ch_123", "re_da_corrida", "stripe", CLOCK.instant());
+
+        when(payments.findByOrderId(ORDER)).thenReturn(Optional.of(payment));
+
+        Optional<View> view = useCase.execute(ORDER, OWNER);
+
+        assertThat(view).isPresent();
+        assertThat(view.get().status()).isEqualTo(PaymentStatus.CANCELLED);
+        assertThat(view.get().refunded())
+                .as("o comprovante do estorno e o que decide, nao o rotulo do status")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("cobranca cancelada sem estorno nao se diz estornada")
+    void cancelledWithoutRefundIsNotRefunded() {
+        Payment payment = Payment.forOrder(ORDER, OWNER,
+                new Money(new BigDecimal("120.00"), "BRL"), PaymentMethod.CREDIT_CARD, CLOCK.instant());
+        payment.cancelBeforeCharge("Cancelled by the customer", CLOCK.instant());
+
+        when(payments.findByOrderId(ORDER)).thenReturn(Optional.of(payment));
+
+        assertThat(useCase.execute(ORDER, OWNER)).get()
+                .extracting(View::refunded)
+                .isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("o valor tambem nao vaza para quem nao e dono")
+    void foreignRequesterGetsNoAmount() {
+        // O campo novo entra pelo mesmo caminho do segredo, então herda o filtro
+        // de dono. Este teste trava isso: adicionar dado ao View não pode virar
+        // uma porta que escapa da regra que já existia.
+        when(payments.findByOrderId(ORDER)).thenReturn(Optional.of(awaitingCard()));
+
+        assertThat(useCase.execute(ORDER, SOMEONE_ELSE)).isEmpty();
     }
 
     @Test

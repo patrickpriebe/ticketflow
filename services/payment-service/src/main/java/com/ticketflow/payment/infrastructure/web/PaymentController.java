@@ -46,11 +46,15 @@ public class PaymentController {
                         view.orderId().toString(),
                         view.method().name(),
                         view.status().name(),
+                        new MoneyPayload(view.amount().amount(), view.amount().currency()),
+                        view.refunded(),
                         view.clientSecret())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
+     * @param amount       o valor da cobrança, para a tela do pedido cancelado
+     *                     poder dizer quanto foi estornado
      * @param clientSecret ausente quando não há o que confirmar. O front trata a
      *                     ausência como "ainda não dá para pagar" e volta a
      *                     perguntar — a cobrança pode nem ter sido criada ainda,
@@ -59,6 +63,18 @@ public class PaymentController {
     public record PaymentView(String orderId,
                               String method,
                               String status,
+                              MoneyPayload amount,
+                              boolean refunded,
                               String clientSecret) {
+    }
+
+    /**
+     * Mesma forma que o Order Service usa em {@code MoneyResponse}.
+     *
+     * <p>Não é detalhe cosmético: o front tem um formatador só, que recebe
+     * {@code {amount, currency}}. Serializar dinheiro de outro jeito aqui
+     * obrigaria a tela a saber de qual serviço veio cada valor.
+     */
+    public record MoneyPayload(java.math.BigDecimal amount, String currency) {
     }
 }

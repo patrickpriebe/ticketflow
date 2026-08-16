@@ -17,6 +17,17 @@ export default defineConfig({
         target: process.env.VITE_TICKETS_URL ?? 'http://localhost:8083',
         changeOrigin: true,
       },
+      // O Payment Service faltava aqui, e o `vercel.json` já o roteava — ou seja,
+      // desenvolvimento e produção discordavam sobre quantos serviços existem.
+      // Localmente `/api/v1/payments/...` caía no Order Service, que não tem
+      // essa rota, e o sintoma era um 500 sem relação aparente com pagamento.
+      // Vale para a busca do `client_secret` do Stripe Elements também: ela
+      // nunca funcionou nesta máquina, e ninguém percebeu porque o gateway
+      // simulado aprova na hora e a tela do cartão quase nunca aparece.
+      '/api/v1/payments': {
+        target: process.env.VITE_PAYMENTS_URL ?? 'http://localhost:8082',
+        changeOrigin: true,
+      },
       '/api': {
         target: process.env.VITE_API_URL ?? 'http://localhost:8081',
         changeOrigin: true,

@@ -179,6 +179,21 @@ The other services copy these choices rather than reinventing them.
   rejects the update, the message is redelivered, the second delivery sees a settled
   payment and returns `ALREADY_SETTLED` without calling anyone. Nobody errors and the
   card stays charged for a cancelled order.
+- **A cancelled charge is not the same as a charge that never happened.** When a
+  cancellation crosses a charge in flight the money goes out and comes back, and the
+  payment stays `CANCELLED` — because that is what happened to the *order*. Reading
+  the status alone makes the screen tell someone who was charged that no charge was
+  made. `refund_id` is the proof, exposed to the browser as a boolean; the receipt
+  decides, not the label.
+- **Only an approved outcome may be applied over a cancelled payment.** The guard in
+  `ProcessOrderPayment` first covered only `APPROVED`, so a gateway timeout wrote
+  `FAILED` over a `CANCELLED` row — and `FAILED` is not terminal, which quietly
+  reopened the charge to the next redelivery. The optimistic lock does not catch it:
+  `update` re-reads the entity, so the version it compares is the one it just loaded.
+- **The dev proxy must route every service the deployed one routes.** `vercel.json`
+  had three targets and `vite.config.ts` had two, so `/api/v1/payments/**` fell
+  through to the Order Service locally and answered 500. It hid for weeks because the
+  simulated gateway approves instantly and the card screen barely renders.
 - **The DLQ needs `dlq-partitions: 1` when it has fewer partitions than its source.**
   The binder writes to the same partition index it read from, so a message from
   partition 2 of a 3-partition topic dies with "partition 2 is not present in

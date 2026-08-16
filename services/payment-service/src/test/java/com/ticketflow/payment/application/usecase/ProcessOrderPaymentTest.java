@@ -155,6 +155,43 @@ class ProcessOrderPaymentTest {
     }
 
     @Test
+    @DisplayName("timeout durante cancelamento nao apaga o CANCELLED da cobranca")
+    void timeoutDoesNotOverwriteCancellation() {
+        // Achado rodando de verdade, com o gateway atrasado de proposito: o
+        // cancelamento marcou a cobranca CANCELLED, o gateway estourou o timeout,
+        // e o `update` gravou FAILED por cima — porque o objeto em memoria ainda
+        // dizia PENDING e o `update` recarrega a entidade, entao o lock otimista
+        // nao ve conflito nenhum.
+        //
+        // O estrago nao e o rotulo errado: FAILED nao e terminal, entao uma
+        // reentrega do ORDER_CREATED voltaria a chamar o provedor para um pedido
+        // que ja acabou. A protecao inteira do cancelamento tinha sido apagada.
+        Payment cancelledMeanwhile = Payment.forOrder(orderId, UUID.randomUUID(),
+                Money.of("1300.00", "BRL"), PaymentMethod.CREDIT_CARD, NOW);
+        cancelledMeanwhile.cancelBeforeCharge("Cancelled by the customer", NOW);
+
+        when(payments.findByOrderId(orderId))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(cancelledMeanwhile));
+        when(payments.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+        when(gateway.authorize(any())).thenReturn(
+                AuthorizationResponse.timedOut("read timeout", 5000));
+
+        ProcessOrderPaymentUseCase.Result result =
+                processOrderPayment.execute(command(PaymentMethod.CREDIT_CARD));
+
+        assertThat(result).isEqualTo(ProcessOrderPaymentUseCase.Result.ALREADY_SETTLED);
+        assertThat(cancelledMeanwhile.status()).isEqualTo(PaymentStatus.CANCELLED);
+        // Nada gravado por cima, e nada estornado: o provedor nao aprovou.
+        verify(payments, never()).update(any());
+        verify(gateway, never()).refund(any());
+        // O evento e marcado mesmo sendo timeout: insistir seria tentar cobrar
+        // quem ja desistiu.
+        verify(processedEvents).record(eventId);
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    @Test
     @DisplayName("a declined charge announces PAGAMENTO_RECUSADO with the reason")
     void rejected() {
         givenNewPayment();

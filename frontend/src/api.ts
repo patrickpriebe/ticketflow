@@ -207,7 +207,25 @@ export function signOut() {
 export interface OrderPayment {
   orderId: string;
   method: PaymentMethod;
+  /**
+   * `PENDING`, `APPROVED`, `REJECTED`, `FAILED`, `CANCELLED` ou `REFUNDED`.
+   *
+   * Os dois últimos são o que a tela do pedido cancelado usa para distinguir
+   * "nada foi cobrado" de "o valor voltou" — coisas bem diferentes para quem
+   * está do outro lado.
+   */
   status: string;
+  /** O valor da cobrança, para a tela poder dizer quanto foi estornado. */
+  amount: Money;
+  /**
+   * Se o dinheiro saiu e voltou.
+   *
+   * Não dá para deduzir do `status`: quando o cancelamento cruza uma cobrança em
+   * voo, o estorno acontece e o status continua `CANCELLED`, porque foi isso que
+   * aconteceu com o pedido. Sem este campo a tela diria "nenhuma cobrança foi
+   * feita" para quem foi cobrado.
+   */
+  refunded: boolean;
   /** Ausente quando não há o que confirmar — inclusive antes de a cobrança existir. */
   clientSecret?: string;
 }

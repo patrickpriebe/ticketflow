@@ -263,6 +263,21 @@ public class Payment {
         return status == PaymentStatus.REFUNDED;
     }
 
+    /**
+     * Houve dinheiro que saiu e voltou.
+     *
+     * <p>Não é o mesmo que {@link #isRefunded()}, e a diferença é justamente o
+     * caso mais difícil: quando o cancelamento cruza uma cobrança em voo, o
+     * dinheiro é devolvido mas o status continua {@link PaymentStatus#CANCELLED},
+     * porque foi isso que aconteceu com o pedido. Perguntar só pelo status faria
+     * a tela dizer "nenhuma cobrança foi feita" para alguém que foi cobrado.
+     *
+     * <p>O comprovante é o que decide, não o rótulo.
+     */
+    public boolean wasRefunded() {
+        return refundId != null;
+    }
+
     public String refundId() {
         return refundId;
     }
