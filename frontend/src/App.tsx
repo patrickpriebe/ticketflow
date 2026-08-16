@@ -63,7 +63,14 @@ export default function App() {
   useEffect(() => {
     listEvents()
       .then((page) => setEvents(page.content))
-      .catch(() => setCatalogError('Não foi possível carregar o catálogo. O Order Service está no ar?'))
+      // A mensagem antiga perguntava se o serviço estava no ar, e quase sempre
+      // estava — só acordando. Dizer isso é mais honesto e não faz quem abriu o
+      // site achar que está quebrado.
+      .catch(() =>
+        setCatalogError(
+          'O catálogo não respondeu a tempo. O ambiente é gratuito e hiberna quando fica ocioso: recarregue em alguns segundos.',
+        ),
+      )
       .finally(() => setLoadingEvents(false));
   }, []);
 

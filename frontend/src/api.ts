@@ -228,16 +228,57 @@ export async function getOrderPayment(orderId: string): Promise<OrderPayment | n
   }
 }
 
+/**
+ * Instância gratuita hiberna, e acordar demora mais que o proxy aguenta.
+ *
+ * O Render derruba o serviço após ~15 minutos parado, e o cold start leva perto
+ * de um minuto — mais que o tempo que o proxy da Vercel espera. O resultado era
+ * a primeira visita depois de um tempo ocioso receber um erro seco ("o Order
+ * Service está no ar?") quando o serviço estava, sim, subindo.
+ *
+ * Nada disso é consertável do lado do servidor sem instância paga. O que dá
+ * para consertar é a mentira: tentar de novo em vez de desistir na primeira, já
+ * que a segunda tentativa pega o serviço acordado.
+ *
+ * Só para 502/503/504 e falha de rede, e só em GET. Um POST repetido aqui seria
+ * outro problema — os que existem carregam Idempotency-Key, mas depender disso
+ * numa camada genérica é o tipo de suposição que envelhece mal.
+ */
+const WAKE_UP_STATUSES = [502, 503, 504];
+const WAKE_UP_ATTEMPTS = 3;
+
+function isRetryable(method: string, status: number | null): boolean {
+  if (method.toUpperCase() !== 'GET') return false;
+  return status === null || WAKE_UP_STATUSES.includes(status);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const active = currentSession();
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(active ? { Authorization: `Bearer ${active.token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  const method = init?.method ?? 'GET';
+  let response: Response | null = null;
+
+  for (let attempt = 1; attempt <= WAKE_UP_ATTEMPTS; attempt++) {
+    try {
+      response = await fetch(path, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(active ? { Authorization: `Bearer ${active.token}` } : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+      if (!isRetryable(method, response.status) || attempt === WAKE_UP_ATTEMPTS) break;
+    } catch (networkError) {
+      // Sem resposta nenhuma: proxy desistiu ou a rede caiu. A primeira é a
+      // comum aqui, e é justamente a que vale repetir.
+      if (!isRetryable(method, null) || attempt === WAKE_UP_ATTEMPTS) throw networkError;
+    }
+    // Espera curta: o serviço já está subindo por causa da tentativa anterior,
+    // então o que falta é tempo de boot, não intervalo entre chamadas.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  if (!response) throw new Error('Sem resposta do servidor');
 
   if (response.status === 401) {
     // Token expirado ou inválido: derruba a sessão em vez de insistir com ela.

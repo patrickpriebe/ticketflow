@@ -11,6 +11,12 @@
  * imagem de um artista real para ilustrar um evento inventado passaria de
  * enfeite a afirmação falsa.
  *
+ * <p><strong>Nenhuma delas tem pessoa identificável</strong>, e isso é critério
+ * de seleção, não sorte. A licença CC resolve o direito do fotógrafo; o direito
+ * de imagem de quem está na foto é outro, pertence a cada pessoa retratada e
+ * não se resolve com crédito. Um local vazio não tem essa segunda camada. Onde
+ * só existia foto com público, o evento fica sem foto.
+ *
  * Servidas pelo próprio site, e não linkadas de fora, por dois motivos: a CSP
  * fecha `img-src` em `'self'`, e um card sem imagem porque um terceiro saiu do
  * ar é uma falha que não precisa existir.
@@ -53,19 +59,17 @@ const PHOTOS: Record<string, EventPhoto> = {
     license: 'CC BY-SA 4.0',
     source: 'https://commons.wikimedia.org/wiki/File:Sesc_Pompeia.jpg',
   },
-  '55555555-5555-4555-8555-555555555555': {
-    src: '/img/events/teatro-rival.jpg',
-    venue: 'Teatro Rival, Rio de Janeiro',
-    author: 'Rodrigo Dutra z',
-    license: 'CC BY-SA 4.0',
-    source: 'https://commons.wikimedia.org/wiki/File:Que_pena,_amor_no_teatro_Rival.jpg',
-  },
+  // O Teatro Rival não tem entrada aqui de propósito. As fotos dele no Commons
+  // são todas de apresentação, com dezenas de rostos identificáveis — e a
+  // licença CC cobre o direito do fotógrafo, não o direito de imagem de quem
+  // aparece. São coisas diferentes, e a segunda não se resolve creditando.
+  // Este evento cai no pôster desenhado, que é exatamente para isto que existe.
   '66666666-6666-4666-8666-666666666666': {
     src: '/img/events/arena-gremio.jpg',
     venue: 'Arena do Grêmio, Porto Alegre',
-    author: 'Cecilia Heinen',
-    license: 'CC BY 2.0',
-    source: 'https://commons.wikimedia.org/wiki/File:Arena_do_Gr%C3%AAmio.jpg',
+    author: 'Guivargas1',
+    license: 'CC0',
+    source: 'https://commons.wikimedia.org/wiki/File:Arena_do_Gr%C3%AAmio_-_Lado_de_fora.jpg',
   },
   '77777777-7777-4777-8777-777777777777': {
     src: '/img/events/marina-da-gloria.jpg',
