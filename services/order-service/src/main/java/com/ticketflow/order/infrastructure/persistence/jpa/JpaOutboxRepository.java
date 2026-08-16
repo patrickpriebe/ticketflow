@@ -6,6 +6,7 @@ import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -50,4 +51,26 @@ public interface JpaOutboxRepository extends JpaRepository<OutboxMessageEntity, 
      */
     @Query("select min(m.createdAt) from OutboxMessageEntity m where m.status = 'PENDING'")
     Instant oldestPendingCreatedAt();
+
+    /**
+     * Apaga mensagens já publicadas há mais tempo que a janela de retenção.
+     *
+     * <p>Só {@code PUBLISHED}. {@code PENDING} ainda tem que sair, e {@code FAILED}
+     * é justamente o que alguém precisa olhar — apagar qualquer um dos dois
+     * transformaria a limpeza em perda de evento.
+     *
+     * <p>Em lote, e não num {@code delete} da tabela inteira: uma varredura que
+     * apaga meses de uma vez segura lock e transação por um tempo imprevisível,
+     * e a instância gerenciada onde isto roda tem cinco conexões no pool.
+     */
+    @Modifying
+    @Query(value = """
+            delete from outbox_messages
+            where id in (
+                select id from outbox_messages
+                where status = 'PUBLISHED' and published_at < :threshold
+                limit :batchSize
+            )
+            """, nativeQuery = true)
+    int deletePublishedBefore(@Param("threshold") Instant threshold, @Param("batchSize") int batchSize);
 }

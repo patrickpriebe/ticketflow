@@ -1,10 +1,56 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { artwork, sequence } from '../lib/artwork';
+import { photoFor } from '../lib/eventPhotos';
 
 interface Props {
   /** Semente do desenho. O mesmo id devolve sempre o mesmo pôster. */
   seed: string;
   className?: string;
+  /** Descrição para quem usa leitor de tela. Sem ela a imagem é decorativa. */
+  alt?: string;
+  /** `true` no herói, que é grande e aparece no primeiro quadro. */
+  priority?: boolean;
+}
+
+/**
+ * A imagem do evento: a foto do local quando existe, o pôster desenhado quando
+ * não existe.
+ *
+ * A troca mora aqui dentro, e não em cada tela, porque os cinco lugares que
+ * mostram um evento querem a mesma resposta para "qual é a imagem disto". Os
+ * heróis passam sementes que não são id de evento — não têm foto e caem no
+ * desenho, sem precisar saber disso.
+ *
+ * O pôster generativo continua no arquivo por dois motivos: é o que aparece
+ * para qualquer evento cadastrado depois do seed, e é o que salva a tela quando
+ * o arquivo da foto não carrega.
+ */
+export function Poster({ seed, className, alt, priority = false }: Props) {
+  const photo = photoFor(seed);
+  const [photoFailed, setPhotoFailed] = useState(false);
+
+  if (photo && !photoFailed) {
+    return (
+      <img
+        className={className}
+        src={photo.src}
+        alt={alt ?? ''}
+        // Fora do herói, a imagem quase sempre está abaixo da dobra.
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        // Reserva o espaço antes de a imagem chegar: sem isto o card cresce
+        // quando ela carrega e empurra o conteúdo que já estava na tela.
+        width={900}
+        height={563}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        // Arquivo faltando volta para o desenho em vez de deixar o buraco da
+        // imagem quebrada — foi assim que uma foto salva errada apareceu.
+        onError={() => setPhotoFailed(true)}
+      />
+    );
+  }
+
+  return <GenerativePoster seed={seed} className={className} />;
 }
 
 /**
@@ -14,7 +60,7 @@ interface Props {
  * Não é aleatório: a sequência vem de um gerador determinístico, senão a arte
  * mudaria a cada re-render e a grade piscaria a cada digitação na busca.
  */
-export function Poster({ seed, className }: Props) {
+function GenerativePoster({ seed, className }: { seed: string; className?: string }) {
   const art = artwork(seed);
   // Um id por instância: dois gradientes com o mesmo id no documento e o
   // segundo elemento passa a usar as cores do primeiro.

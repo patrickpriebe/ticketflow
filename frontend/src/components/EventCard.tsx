@@ -22,7 +22,7 @@ export function EventCard({ event, variant = 'default' }: Props) {
   return (
     <article className={`event-card${variant === 'featured' ? ' featured' : ''}`}>
       <div className="event-art">
-        <Poster seed={event.id} />
+        <Poster seed={event.id} priority={variant === 'featured'} />
         {soldOut ? (
           <span className="art-badge">Esgotado</span>
         ) : days <= 21 ? (

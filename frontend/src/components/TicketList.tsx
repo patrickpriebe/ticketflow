@@ -17,15 +17,24 @@ const MODULES = 21;
  * estável, e não um quadrado cinza igual para todos.
  */
 function modules(payload: string): boolean[] {
-  let state = 2166136261;
+  // `>>> 0` em toda etapa, e não só no fim. `Math.imul` devolve inteiro com
+  // sinal, então metade dos códigos saía daqui com estado negativo — e
+  // `negativo % 4294967296` continua negativo, o que fazia `> 0.5` nunca ser
+  // verdade e o ingresso aparecer como uma moldura vazia, só com os três olhos.
+  // Era exatamente metade dos ingressos, e passava por decoração feia em vez de
+  // defeito: `TF-44QQ16ZSPO` desenhava zero módulos, `TF-Z9GEC500E5` desenhava 221.
+  let state = 2166136261 >>> 0;
   for (let i = 0; i < payload.length; i++) {
-    state ^= payload.charCodeAt(i);
-    state = Math.imul(state, 16777619);
+    state = (state ^ payload.charCodeAt(i)) >>> 0;
+    state = Math.imul(state, 16777619) >>> 0;
   }
 
   const cells: boolean[] = [];
   for (let i = 0; i < MODULES * MODULES; i++) {
-    state = (state * 1664525 + 1013904223) % 4294967296;
+    // Math.imul em vez de `*`: o produto de dois valores de 32 bits passa de
+    // 2^53 e os bits baixos — justamente os que decidem cada módulo — viram
+    // ruído de arredondamento.
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     cells.push(state / 4294967296 > 0.5);
   }
   return cells;

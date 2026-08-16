@@ -261,6 +261,57 @@
   z-index: 1;
 }
 
+/* Crédito da foto: exigido pelas licenças CC BY / CC BY-SA, e discreto o
+   bastante para não competir com o nome do evento.
+
+   Só o autor e a licença. A primeira versão repetia o local, que já está na
+   linha logo acima — no telefone as duas se sobrepunham, e a informação
+   duplicada era justamente a que sobrava. */
+.photo-credit {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  z-index: 1;
+  margin: 0;
+  max-width: min(60%, 40ch);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  text-align: right;
+  color: color-mix(in srgb, #fff 72%, transparent);
+  /* A foto por baixo pode ser clara em qualquer ponto. */
+  text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
+}
+
+.photo-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.photo-credit a:hover {
+  color: #fff;
+}
+
+/* No telefone o herói é estreito e a linha do local desce até onde o crédito
+   está, e as duas se sobrepunham.
+
+   A saída é abrir espaço, não tirar o crédito do lugar: `.event-hero` é flex,
+   então um crédito em fluxo normal vira uma coluna ao lado do conteúdo em vez
+   de uma linha embaixo dele — foi exatamente o que aconteceu na primeira
+   tentativa. Ele continua absoluto, e o herói ganha o espaço que ele ocupa. */
+@media (max-width: 767px) {
+  .event-hero {
+    padding-bottom: calc(var(--space-6) + 1.5rem);
+  }
+
+  .photo-credit {
+    left: var(--space-4);
+    right: var(--space-4);
+    max-width: none;
+    text-align: left;
+  }
+}
+
 .event-hero h1 {
   max-width: 22ch;
   color: #fff;

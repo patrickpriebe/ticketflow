@@ -158,6 +158,20 @@ ticketflow:
     # é publicar no destino errado sem ninguém perceber.
     bindings: "{'ticketflow.orders.created': 'orderCreated-out-0', 'ticketflow.orders.cancelled': 'orderCancelled-out-0'}"
 
+  retention:
+    # Nem o outbox nem o inbox tinham limpeza, e as duas tabelas só cresciam.
+    enabled: true
+    # De hora em hora: o que se evita aqui é crescimento de meses, não de minutos.
+    interval: 3600000
+    initial-delay: 60000
+    # Mensagem PUBLISHED já cumpriu o papel dela. PENDING e FAILED nunca saem.
+    outbox: P7D
+    # Precisa ser MAIOR que a retenção dos tópicos (7 dias): enquanto o Kafka
+    # ainda puder reentregar, o registro que deduplica tem que existir.
+    inbox: P30D
+    batch-size: 500
+    max-batches-per-cycle: 10
+
 ---
 # Running from the IDE / `mvnw spring-boot:run` on Windows.
 # Postgres is published on 5433 because 5432 is taken by a native install.

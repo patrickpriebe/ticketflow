@@ -168,6 +168,22 @@ The other services copy these choices rather than reinventing them.
   topic. `ticketflow.outbox.bindings` maps topic → binding, and an unmapped topic
   throws instead of silently publishing to the wrong destination — a cancellation
   landing on `orders.created` would have the Payment Service charge a cancelled order.
+- **Every append-only support table has a retention window.** `outbox_messages`,
+  `processed_events` and `payment_webhook_events` only ever grew. Nothing breaks in a
+  day, and that is the trap: the bill arrives months later as a slow query and a full
+  disk, with nothing pointing at the cause. A `RetentionSweeper` in each Postgres
+  service deletes in bounded batches. Two rules it must keep: only `PUBLISHED` leaves
+  the outbox (`PENDING` still has to go out, `FAILED` is what someone needs to read),
+  and **every inbox window must outlive the redelivery window of whoever feeds it** —
+  Kafka keeps 7 days, Stripe retries for days, so the inboxes keep 30. Shortening one
+  reopens the double-processing the table exists to prevent.
+- **`Math.imul` returns a signed 32-bit int.** The ticket QR glyph hashed its payload
+  and never masked the sign, so half of all codes produced a negative state, `negative
+  % 2^32` stayed negative, and the comparison that lights a module was never true — the
+  ticket rendered as an empty frame with only the three corner eyes. It read as ugly
+  decoration rather than a bug. Mask with `>>> 0` at every step, and use `Math.imul`
+  for the multiply too: a plain `*` of two 32-bit values exceeds 2^53 and the low bits
+  that decide each module become rounding noise.
 - **Dangerous defaults are safe even when they cost nothing today.**
   `ticketflow.observability.public-metrics` is `false` by default; only the compose
   file and the Kubernetes ConfigMap turn it on. Open, `/actuator/prometheus` gives away

@@ -6,6 +6,7 @@ import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -41,4 +42,21 @@ public interface JpaOutboxRepository extends JpaRepository<OutboxMessageEntity, 
      */
     @Query("select min(m.createdAt) from OutboxMessageEntity m where m.status = 'PENDING'")
     Instant oldestPendingCreatedAt();
+    /**
+     * Apaga mensagens ja publicadas ha mais tempo que a janela de retencao.
+     *
+     * <p>Mesma regra do Order Service: so {@code PUBLISHED}. {@code PENDING} ainda
+     * tem que sair e {@code FAILED} e o que alguem precisa investigar — apagar
+     * qualquer um dos dois seria perder evento em vez de limpar tabela.
+     */
+    @Modifying
+    @Query(value = """
+            delete from outbox_messages
+            where id in (
+                select id from outbox_messages
+                where status = 'PUBLISHED' and published_at < :threshold
+                limit :batchSize
+            )
+            """, nativeQuery = true)
+    int deletePublishedBefore(@Param("threshold") Instant threshold, @Param("batchSize") int batchSize);
 }

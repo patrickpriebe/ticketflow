@@ -11,6 +11,13 @@ import { getOrder, ProblemError, type Order } from './api';
  *
  * O intervalo para sozinho quando o pedido chega a um estado final, para a aba não
  * ficar batendo na API para sempre.
+ *
+ * E para também enquanto a aba está escondida. Um pedido abandonado em PENDING
+ * fica quinze minutos até expirar; a dois segundos por consulta, uma aba largada
+ * em segundo plano são umas 450 requisições que ninguém vai ler — numa instância
+ * gratuita, isso é tempo de CPU tirado de quem está usando o site de verdade. Ao
+ * voltar para a aba, a consulta acontece na hora, então quem estava esperando o
+ * pagamento vê o estado atual em vez de um valor velho.
  */
 export function useOrderStatus(orderId: string | null, intervalMs = 2000) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -24,6 +31,22 @@ export function useOrderStatus(orderId: string | null, intervalMs = 2000) {
 
     let cancelled = false;
     let timer: number | undefined;
+    let waitingForFocus = false;
+
+    const scheduleNext = (delay: number) => {
+      if (document.hidden) {
+        // Nada de timer: quem retoma é o visibilitychange abaixo.
+        waitingForFocus = true;
+        return;
+      }
+      timer = window.setTimeout(poll, delay);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden || !waitingForFocus || cancelled) return;
+      waitingForFocus = false;
+      poll();
+    };
 
     const poll = async () => {
       try {
@@ -34,7 +57,7 @@ export function useOrderStatus(orderId: string | null, intervalMs = 2000) {
         setError(null);
 
         if (current.status === 'PENDING') {
-          timer = window.setTimeout(poll, intervalMs);
+          scheduleNext(intervalMs);
         }
       } catch (e) {
         if (cancelled) return;
@@ -48,15 +71,17 @@ export function useOrderStatus(orderId: string | null, intervalMs = 2000) {
         if (definitive) return;
 
         // Erro de rede é outra coisa: aí sim vale tentar de novo, mais devagar.
-        timer = window.setTimeout(poll, intervalMs * 2);
+        scheduleNext(intervalMs * 2);
       }
     };
 
+    document.addEventListener('visibilitychange', onVisibilityChange);
     poll();
 
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [orderId, intervalMs]);
 

@@ -133,6 +133,20 @@ ticketflow:
     max-attempts: 8
     output-binding: paymentProcessed-out-0
 
+  retention:
+    # Três tabelas de apoio que só cresciam. Nada de `payments` ou
+    # `payment_attempts` sai daqui: aquilo é o registro do dinheiro.
+    enabled: true
+    interval: 3600000
+    initial-delay: 60000
+    outbox: P7D
+    # As duas janelas de inbox têm que cobrir o prazo de reentrega de quem as
+    # alimenta — Kafka guarda 7 dias, e o Stripe reenvia por dias até receber 200.
+    inbox: P30D
+    webhook: P30D
+    batch-size: 500
+    max-batches-per-cycle: 10
+
 ---
 spring:
   config:

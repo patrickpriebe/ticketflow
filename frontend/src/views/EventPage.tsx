@@ -1,6 +1,7 @@
 import type { EventDetail } from '../api';
 import { Icon } from '../components/Icon';
 import { Poster } from '../components/Poster';
+import { photoFor } from '../lib/eventPhotos';
 import {
   canAddCategory,
   cartCount,
@@ -26,13 +27,27 @@ export function EventPage({ event, cart, onCart }: Props) {
   const count = cartCount(cart);
   const total = cartTotal(cart);
   const chosen = cart.lines;
+  const photo = photoFor(event.id);
 
   return (
     <>
       <div className="event-hero">
         <div className="hero-art">
-          <Poster seed={event.id} />
+          <Poster seed={event.id} alt={`${event.venue}, ${event.city}`} priority />
         </div>
+
+        {photo && (
+          // Crédito onde a foto aparece grande. As licenças CC BY e CC BY-SA
+          // exigem atribuição, e a lista completa fica em
+          // frontend/public/img/events/CREDITS.json.
+          <p className="photo-credit">
+            Foto:{' '}
+            <a href={photo.source} target="_blank" rel="noreferrer noopener">
+              {photo.author}
+            </a>{' '}
+            ({photo.license})
+          </p>
+        )}
 
         <div className="shell">
           <button className="back" onClick={() => navigate('/events')}>

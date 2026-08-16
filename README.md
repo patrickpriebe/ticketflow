@@ -710,8 +710,9 @@ Recorded so they do not look like oversights.
   hold real inventory for the length of the payment window. The expiry sweep bounds the
   damage rather than preventing it, and the fix belongs at the edge (Render, or a
   gateway), not in a `for` loop inside the use case.
-- **`processed_events` grows without bound in PostgreSQL.** The MongoDB one already has
-  a 30-day TTL; the relational ones need a scheduled cleanup.
+- **The QR code on a ticket is a drawing, not a scannable code.** Generating a real one
+  needs Reed-Solomon error correction, and the library that does it weighs more than
+  the rest of the screen. The payload the gate would read is the ticket code itself.
 - **The catalogue has no administrative path.** Events are seeded locally and were
   inserted by hand in the deployed environment.
 - **Redpanda Cloud is on trial credit**, not a permanent free tier.
