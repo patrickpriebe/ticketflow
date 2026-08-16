@@ -1,0 +1,205 @@
+# The Bugs That Designed My Architecture
+
+## What building a distributed ticket-selling system actually taught me
+
+---
+
+I built TicketFlow to answer one question honestly: *what does it take for an order to be accepted in milliseconds while the money resolves later?*
+
+Not "how do I wire Kafka to Spring Boot." That part is a tutorial. The interesting part is everything that goes wrong once two services stop sharing a transaction — and every one of those failures ended up shaping the architecture.
+
+This article is the architecture, told through the defects that earned each piece of it.
+
+**The system:** three Spring Boot services that never call each other, two PostgreSQL databases and one MongoDB, six Kafka topics, a React frontend with no runtime dependencies beyond React, Stripe for real payments, Google for identity. 53 commits, ~17,000 lines of Java, 200 tests. It runs locally with one command and it's deployed.
+
+---
+
+## The rule everything else obeys
+
+**No synchronous call between Order, Payment and Notification.** Ever. If a `RestTemplate` points from one service to another, that's an architecture bug, not a shortcut.
+
+This sounds like purity until you hit the first real case that seems to require breaking it.
+
+Stripe Elements needs a `client_secret` to confirm a card in the browser. That secret is born in the Payment Service, because that's who talked to Stripe. The checkout screen lives against the Order Service. So how does the secret get across?
+
+Two obvious answers, both bad:
+
+- **Order Service calls Payment Service** over HTTP. Breaks the rule.
+- **Ship the secret through a Kafka event** into the Order Service's database. Now a payment credential is sitting in a topic and replicated into another service's storage.
+
+The answer was to notice a hidden assumption: *the browser is not a service.* It can talk to all three directly. The secret goes from the Payment Service straight to the page that needs it. **The services still never talk to each other** — which is the rule that actually mattered. The one I thought I had to break was a rule I'd invented by accident.
+
+> When a constraint seems to force a bad design, check whether you're defending the real constraint or a habit wearing its clothes.
+
+---
+
+## The outbox, and the day it published to the wrong topic
+
+An order and the event announcing it must both happen, or neither. Two writes to two systems can't promise that — so the event is written to an `outbox_messages` table **in the same transaction as the order**, and a separate relay ships it to Kafka afterwards.
+
+Standard pattern. Mine had a bug that stayed invisible for weeks because the system was too simple to expose it.
+
+The relay published every row through **one fixed binding**. Each outbox row carried its own `topic` column — and the publisher ignored it. With exactly one topic in the system, that worked by coincidence.
+
+Then I added order cancellation, and a second topic. The `ORDER_CANCELLED` event would have gone out on `ticketflow.orders.created`. The Payment Service would have read a cancellation as a **brand new order and charged the customer's card for an order they'd just cancelled.**
+
+The fix is that the destination comes from the row, and an unmapped topic throws instead of silently choosing the wrong one:
+
+```java
+String binding = bindings.get(topic);
+if (binding == null) {
+    throw new IllegalStateException("No binding configured for topic " + topic);
+}
+```
+
+> Code that works "by coincidence" doesn't announce itself. It waits for the second case.
+
+Delivery is deliberately **at-least-once**: the message is sent, *then* marked published. Crash in between and it sends twice. That's correct — the alternative loses events, and nothing downstream can recover from an event that never existed. Duplicates are somebody's problem, and that somebody is the inbox.
+
+---
+
+## The bug I'm least proud of
+
+Every consumer records each `eventId` in a `processed_events` table before acting. Redelivery finds the row and does nothing. Fine.
+
+The interesting failure was on the *write* side — the `Idempotency-Key` header on `POST /orders`.
+
+It worked exactly as designed: send the same key twice, get the original order back instead of creating a duplicate. The key had a `UNIQUE` constraint. Textbook.
+
+The constraint was unique **across the entire table.**
+
+So: a customer sends `Idempotency-Key: order-1`. Someone else had already used `order-1` — because of course they had, it's the value everybody picks. The API looked up that key, found *their* order, and replayed it. **`200 OK`, with a stranger's name, e-mail, what they bought and what they paid.**
+
+No stolen token. No probing for ids. Nothing in the logs that looks like an attack. A header two people chose without coordinating.
+
+```sql
+-- before: any customer could replay any other customer's order
+CONSTRAINT uq_orders_idempotency_key UNIQUE (idempotency_key)
+
+-- after: the key only means something inside its owner
+CONSTRAINT uq_orders_customer_idempotency_key UNIQUE (customer_id, idempotency_key)
+```
+
+Scoped in the query *and* in the constraint. Two people using `order-1` stopped being a conflict, because it never was one.
+
+The rule I took from it is bigger than the bug:
+
+> **Any value the client chooses is an input. Looking something up by it without scoping it to the caller is an authorization decision you made by accident.**
+
+The same project already had the principle stated elsewhere — *not-yours and not-found answer the same, because a `403` confirms the resource exists to whoever is probing ids.* I'd written that rule down and still walked past this. Principles don't apply themselves.
+
+---
+
+## Three words that aren't synonyms
+
+The Payment Service distinguishes three outcomes, and collapsing any two destroys information:
+
+- **`REJECTED`** — the gateway said no. Insufficient funds, expired card. Final. Tell the customer.
+- **`FAILED`** — the gateway never gave a usable answer. Timeout, 5xx. **Nobody knows whether the money moved.** Retry may succeed.
+- **`ACCEPTED`** — the provider took it; the answer arrives later by webhook. Nothing is decided.
+
+Turning "the gateway didn't answer" into "the card was declined" is the specific mistake this prevents. One is a fact about the customer; the other is a fact about the network. A boleto that says *declined* because a socket timed out is a lie your support team gets to explain.
+
+---
+
+## Cancellation: one event, three different disasters
+
+This was the hardest thing in the project, and the part I'd bring to an interview.
+
+A customer cancels. The obvious implementation asks the Payment Service whether the card was already charged, then decides. That's a synchronous call — forbidden — and it holds the customer on a spinner because a provider is slow.
+
+So the order cancels immediately and publishes `ORDER_CANCELLED`. Whoever holds the money decides what to do with it.
+
+The consequence is accepted deliberately: **for a moment there can be a cancelled order whose card was charged.** That's a real state in a distributed system, and the answer to it is a refund — not a lock pretending the race doesn't exist.
+
+Then it turns out the event can arrive at three different moments, and each one is a different bug if you get it wrong.
+
+**Before the charge exists.** The Payment Service writes a payment that is *already cancelled*. The `UNIQUE (order_id)` constraint means the `ORDER_CREATED` arriving later finds it settled and never calls the provider. Skip this and the card gets charged with nothing left to refund it — the cancellation was already consumed and marked processed.
+
+**After the charge was approved.** Refund. This is the case the whole design exists for.
+
+**While the charge is in flight** — the nastiest one. The in-memory payment still says `PENDING`, the database row already says `CANCELLED`, and the money just left. Without handling it: the update hits the optimistic lock, the message is redelivered, the second delivery sees a settled payment and returns `ALREADY_SETTLED` without calling anyone.
+
+**Nobody errors. Nothing appears in a dead-letter queue. The card stays charged for a cancelled order.** That's the worst kind of bug — one that produces no signal at all.
+
+The fix re-reads the payment after the gateway answers and refunds on the spot, which works precisely because that code path is deliberately outside any transaction.
+
+Which brings up something worth saying plainly: **the gateway call happens outside the transaction, on purpose.** Wrapping the whole flow in one transaction pins a database connection for the duration of an external call. That's the classic way a slow provider takes your database down with it.
+
+---
+
+## Security defaults, and why "it costs nothing today" is the trap
+
+Three things here, and they share a shape.
+
+**`audience` is mandatory.** A valid signature and the right issuer prove Google issued the token. They do **not** prove it was issued *for you*. Google signs tokens for every registered application, and the `sub` is the same person across all of them — so a legitimate token from any other app would log that person into your system. All three services refuse to boot on an issuer without an audience. Getting this wrong breaks no test and shows up in no code review: the service starts, answers requests, and is simply open.
+
+**A dangerous flag defaults to safe.** `dev-tokens` — which issues a token for any e-mail with no password — was once `true` in the base config. Deploying anywhere without remembering to override it left an identity issuer open on the internet. Today it's `false`, and only the local and docker profiles turn it on. *Forgetting became harmless instead of catastrophic.*
+
+**`/actuator/prometheus` was public on all three services.** Locally that's right — Prometheus scrapes it. Deployed, the services answer directly on the internet and *nothing* scrapes them, so the same route handed anyone order volume, approved and declined amounts, every API route and the exact JVM version. Now it's behind a flag that defaults to closed and is enabled only where a scraper exists.
+
+> The pattern: a dangerous default that costs nothing today is still a dangerous default. It's waiting for the deploy where somebody forgets.
+
+---
+
+## The panel that never had data
+
+Two Grafana latency panels showed "No data" from the day they were born.
+
+Micrometer doesn't publish histogram buckets by default, so every `histogram_quantile` returns nothing. The dashboard looked complete and measured nothing.
+
+That's worse than having no panel at all. **A panel that's always empty teaches people to ignore the dashboard** — and then the panel that *does* matter gets ignored too.
+
+Fixed by enabling `percentiles-histogram` with SLO boundaries that mean something for this API: `POST /orders` doesn't wait for payment, so hundreds of milliseconds there is already a symptom.
+
+---
+
+## Three operational bugs that only appear later
+
+**The tables that only grew.** `outbox_messages`, `processed_events` and `payment_webhook_events` had no cleanup at all. Nothing breaks in a day — that's the trap. The bill arrives months later as a slow query and a full disk, with nothing pointing at the cause. Now a `RetentionSweeper` deletes in bounded batches, with two rules it can't break: only `PUBLISHED` leaves the outbox (`PENDING` still has to go out, `FAILED` is what someone needs to read), and **every inbox window must outlive the redelivery window of whoever feeds it.** Kafka keeps 7 days, Stripe retries for days — so the inboxes keep 30. Shorten one and you reopen the double-processing the table exists to prevent.
+
+**The DLQ that lost the poison message.** My dead-letter topics had one partition; the source topics have three. The binder writes to the *same partition index* it read from — so a message from partition 2 died with `partition 2 is not present in metadata`. The poison message was lost by the exact mechanism built to preserve it. One line: `dlq-partitions: 1`.
+
+**`@Scheduled` and `@Transactional` on the same class.** The timer calls the method on `this`, bypassing the Spring proxy entirely, and the transaction never exists. The relay failed every cycle with *"no transaction is known to be in progress."* It only showed up running for real. The trigger now lives in its own bean.
+
+---
+
+## Deploy traps that each cost one red deploy
+
+- **A `sync: false` variable is not created by an automatic blueprint sync.** Render has nobody to ask for the value, so the variable is simply absent and the service fails to boot. That's the desired behaviour — but expect a red deploy until you fill it in.
+- **Vite inlines `VITE_*` at build time.** Adding the variable in the panel does nothing to an already-published site. It needs a rebuild.
+- **Environments must not share a Kafka consumer group.** With one broker for local and deployed, Kafka splits the partitions between them and half the orders get processed by the wrong environment — with no error anywhere. An order created on my laptop was processed by production.
+- **Managed free databases have low connection ceilings.** Supabase's free pooler accepts 15; a pool of 10 per instance means the second instance to start dies during migration.
+
+---
+
+## And one bug that was just arithmetic
+
+Half of all issued tickets rendered an empty QR frame — only the three corner squares, no data.
+
+`Math.imul` returns a **signed** 32-bit integer. Half the ticket codes hashed to a negative value; `negative % 2^32` stays negative; the comparison that lights each module was never true. It read as ugly decoration rather than a defect, which is why it survived.
+
+```js
+// every step masked, and Math.imul for the multiply too:
+// a plain * of two 32-bit values exceeds 2^53 and the low bits
+// that decide each module become rounding noise
+state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+```
+
+`TF-44QQ16ZSPO` drew **zero** modules. `TF-Z9GEC500E5` drew 221.
+
+---
+
+## What I'd tell someone starting one
+
+**Write down the rule, then actually apply it.** I had "never look something up by a client-supplied value without scoping it" written in the project's own conventions, and still shipped the idempotency leak. Documented principles don't enforce themselves — tests do.
+
+**Prefer bugs that fail loudly.** Almost every defect here was dangerous in proportion to how quietly it failed. The routing bug, the in-flight cancellation, the empty Grafana panel — none of them threw. The ones that crashed were fixed in minutes.
+
+**Run it, don't just test it.** The QR bug, the missing refund endpoint and the DLQ partition mismatch were all invisible to unit tests and obvious within seconds of using the thing.
+
+**Say what doesn't work.** My README has a *Known limits* section: no rate limiting, refunds aren't surfaced to the customer, the QR is decorative. A portfolio that claims to be finished is less credible than one that knows exactly where it stops.
+
+---
+
+*Code, architecture docs and event contracts: [github.com/patrickpriebe/ticketflow](https://github.com/patrickpriebe/ticketflow) — live at [ticketflow-br.vercel.app](https://ticketflow-br.vercel.app)*

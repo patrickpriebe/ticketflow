@@ -1,0 +1,93 @@
+{
+  "name": "TicketFlow -> Medium draft",
+  "meta": {
+    "description": "Watches content/medium/*.md on main and creates a NEW DRAFT on Medium whenever it changes. It cannot update an existing post: Medium's Posts API only supports POST (create) - there is no PUT/PATCH - and the API itself is marked 'no longer supported'. So the flow ends at a draft you review and publish, replacing the previous one by hand."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "owner": "patrickpriebe",
+        "repository": "ticketflow",
+        "events": ["push"]
+      },
+      "id": "trigger-github",
+      "name": "GitHub push",
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "webhookId": "ticketflow-medium"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Só segue se o push foi na main E mexeu no texto do artigo.\n// Sem este filtro, todo commit do projeto viraria um rascunho novo.\nconst body = $input.first().json.body ?? $input.first().json;\n\nif (body.ref !== 'refs/heads/main') return [];\n\nconst touched = (body.commits ?? []).flatMap((c) => [\n  ...(c.added ?? []), ...(c.modified ?? [])\n]);\n\nconst article = touched.find((p) => p.startsWith('content/medium/') && p.endsWith('.md'));\nif (!article) return [];\n\nreturn [{ json: { path: article, sha: body.after } }];"
+      },
+      "id": "filter",
+      "name": "Só quando o artigo mudou",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://raw.githubusercontent.com/patrickpriebe/ticketflow/{{ $json.sha }}/{{ $json.path }}",
+        "options": { "response": { "response": { "responseFormat": "text" } } }
+      },
+      "id": "fetch",
+      "name": "Buscar markdown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// O H1 do arquivo vira o título do post; o resto vira o corpo.\n// Repetir o título dentro do conteúdo faz o Medium mostrar dois títulos.\nconst md = $input.first().json.data ?? '';\nconst lines = md.split('\\n');\n\nconst h1 = lines.findIndex((l) => l.startsWith('# '));\nconst title = h1 >= 0 ? lines[h1].replace(/^#\\s+/, '').trim() : 'TicketFlow';\nconst content = (h1 >= 0 ? lines.slice(h1 + 1) : lines).join('\\n').trim();\n\nreturn [{ json: {\n  title,\n  contentFormat: 'markdown',\n  content,\n  publishStatus: 'draft',\n  tags: ['software-architecture', 'microservices', 'kafka', 'java', 'distributed-systems'],\n  canonicalUrl: 'https://github.com/patrickpriebe/ticketflow'\n} }];"
+      },
+      "id": "build",
+      "name": "Montar o post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.medium.com/v1/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "whoami",
+      "name": "Medium: quem sou eu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "notes": "Credencial Header Auth: Name = Authorization, Value = Bearer <integration token>. Devolve o authorId que a criação do post exige."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.medium.com/v1/users/{{ $json.data.id }}/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Montar o post').first().json) }}",
+        "options": {}
+      },
+      "id": "create-draft",
+      "name": "Medium: criar rascunho",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 0],
+      "notes": "publishStatus=draft de proposito. A API do Medium nao tem update de post: publicar direto criaria um artigo novo a cada push, duplicando o conteudo."
+    }
+  ],
+  "connections": {
+    "GitHub push": { "main": [[{ "node": "Só quando o artigo mudou", "type": "main", "index": 0 }]] },
+    "Só quando o artigo mudou": { "main": [[{ "node": "Buscar markdown", "type": "main", "index": 0 }]] },
+    "Buscar markdown": { "main": [[{ "node": "Montar o post", "type": "main", "index": 0 }]] },
+    "Montar o post": { "main": [[{ "node": "Medium: quem sou eu", "type": "main", "index": 0 }]] },
+    "Medium: quem sou eu": { "main": [[{ "node": "Medium: criar rascunho", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
