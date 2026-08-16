@@ -72,6 +72,10 @@ public class PaymentEntity {
     @Column(name = "authorized_at")
     private Instant authorizedAt;
 
+    /** Comprovante do estorno. Só existe quando o status é REFUNDED. */
+    @Column(name = "refund_id", length = 120)
+    private String refundId;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -107,7 +111,7 @@ public class PaymentEntity {
     /** Applies the outcome decided by the domain. */
     public void applyOutcome(PaymentStatus status, String gatewayName, String gatewayTransactionId,
                              String failureCode, String failureReason, int attempts,
-                             Instant authorizedAt, Instant updatedAt) {
+                             Instant authorizedAt, Instant updatedAt, String refundId) {
         this.status = status;
         this.gatewayName = gatewayName;
         this.gatewayTransactionId = gatewayTransactionId;
@@ -116,6 +120,11 @@ public class PaymentEntity {
         this.attempts = attempts;
         this.authorizedAt = authorizedAt;
         this.updatedAt = updatedAt;
+        this.refundId = refundId;
+    }
+
+    public String getRefundId() {
+        return refundId;
     }
 
     public void addAttempt(PaymentAttemptEntity attempt) {

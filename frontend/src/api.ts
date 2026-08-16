@@ -283,6 +283,21 @@ export function getOrder(orderId: string): Promise<Order> {
   return request<Order>(`/api/v1/orders/${orderId}`);
 }
 
+/**
+ * Cancela o pedido e devolve ele já cancelado.
+ *
+ * `POST` e não `DELETE`: o pedido não deixa de existir, muda de estado — e esse
+ * registro é parte do que a tela mostra.
+ *
+ * O backend responde 409 quando o pedido já acabou (pago, cancelado, expirado).
+ * Isso não é erro de quem clicou: é a corrida normal entre o botão e o
+ * pagamento chegando. Quem chama trata como "já resolveu sozinho" e mostra o
+ * estado atual, sem cara de falha.
+ */
+export function cancelOrder(orderId: string): Promise<Order> {
+  return request<Order>(`/api/v1/orders/${orderId}/cancel`, { method: 'POST' });
+}
+
 export function listMyOrders(status?: OrderStatus): Promise<Page<Order>> {
   const query = status ? `?status=${status}` : '';
   return request<Page<Order>>(`/api/v1/orders${query}`);

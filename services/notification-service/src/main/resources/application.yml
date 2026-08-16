@@ -48,11 +48,23 @@ spring:
               start-offset: earliest
               enable-dlq: true
               dlq-name: ticketflow.orders.created.dlq
+              # As DLQ tem UMA particao e os topicos de origem tem tres. Sem isto
+              # o binder tenta escrever na mesma particao de onde leu, e uma
+              # mensagem vinda da particao 1 ou 2 morre com "partition N is not
+              # present in metadata" - a mensagem envenenada se perde justamente
+              # no mecanismo que existe para nao perde-la.
+              dlq-partitions: 1
           paymentProcessed-in-0:
             consumer:
               start-offset: earliest
               enable-dlq: true
               dlq-name: ticketflow.payments.processed.dlq
+              # As DLQ tem UMA particao e os topicos de origem tem tres. Sem isto
+              # o binder tenta escrever na mesma particao de onde leu, e uma
+              # mensagem vinda da particao 1 ou 2 morre com "partition N is not
+              # present in metadata" - a mensagem envenenada se perde justamente
+              # no mecanismo que existe para nao perde-la.
+              dlq-partitions: 1
 
 ticketflow:
   auth:

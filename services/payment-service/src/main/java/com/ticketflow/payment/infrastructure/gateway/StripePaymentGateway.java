@@ -109,6 +109,66 @@ public class StripePaymentGateway implements PaymentGateway {
     }
 
     /**
+     * Estorno pela API de Refunds do Stripe.
+     *
+     * <p>A separação entre recusa e indisponibilidade é a mesma da autorização, e
+     * pelo mesmo motivo: {@link ApiConnectionException} não é "não vou estornar",
+     * é "não sei se estornei". Tratar como recusa deixaria o cliente sem o
+     * dinheiro dele, com o sistema achando que a conta está fechada.
+     *
+     * <p>O valor é convertido para centavos porque o Stripe trabalha na menor
+     * unidade da moeda. O {@code BigDecimal} vem do domínio justamente para essa
+     * conversão não passar por {@code double} — é a mesma regra que vale no
+     * resto do projeto.
+     */
+    @Override
+    public RefundResponse refund(RefundRequest request) {
+        Timer.Sample sample = Timer.start(registry);
+
+        try {
+            com.stripe.model.Refund refund = stripe.refunds().create(
+                    com.stripe.param.RefundCreateParams.builder()
+                            .setPaymentIntent(request.transactionId())
+                            .setAmount(request.amount()
+                                    .movePointRight(2)
+                                    .setScale(0, java.math.RoundingMode.HALF_UP)
+                                    .longValueExact())
+                            .build(),
+                    // Prefixada para não colidir com a chave da cobrança: são duas
+                    // operações diferentes sobre o mesmo pagamento.
+                    RequestOptions.builder()
+                            .setIdempotencyKey("refund-" + request.idempotencyKey())
+                            .build());
+
+            sample.stop(refundTimer("REFUNDED"));
+            log.info("Stripe estornou o pagamento {} ({})", request.paymentId(), refund.getId());
+            return RefundResponse.refunded(refund.getId(), 200);
+
+        } catch (ApiConnectionException e) {
+            sample.stop(refundTimer("UNAVAILABLE"));
+            log.warn("Stripe nao respondeu ao estorno do pagamento {}: {}",
+                    request.paymentId(), e.getMessage());
+            return RefundResponse.unavailable(e.getMessage(), null);
+
+        } catch (StripeException e) {
+            // 5xx pede nova tentativa; o resto é resposta definitiva do provedor.
+            boolean retryable = e.getStatusCode() != null && e.getStatusCode() >= 500;
+            sample.stop(refundTimer(retryable ? "UNAVAILABLE" : "DECLINED"));
+            log.error("Stripe recusou o estorno do pagamento {}: {}", request.paymentId(), e.getMessage());
+            return retryable
+                    ? RefundResponse.unavailable(e.getMessage(), e.getStatusCode())
+                    : RefundResponse.declined(e.getMessage(), e.getStatusCode());
+        }
+    }
+
+    private Timer refundTimer(String outcome) {
+        return Timer.builder("ticketflow.payment.gateway.refunds")
+                .description("Refund calls to Stripe")
+                .tag("outcome", outcome)
+                .register(registry);
+    }
+
+    /**
      * Traduz o estado do PaymentIntent para o vocabulário do domínio.
      *
      * <p>{@code requires_action} e {@code requires_payment_method} não são falhas:

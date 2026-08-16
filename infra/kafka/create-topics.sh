@@ -53,6 +53,7 @@ create_topic "ticketflow.orders.cancelled"        3 604800000    # 7 days
 # Dead letter topics: kept much longer, they are the debugging trail.
 create_topic "ticketflow.orders.created.dlq"      1 2592000000   # 30 days
 create_topic "ticketflow.payments.processed.dlq"  1 2592000000   # 30 days
+create_topic "ticketflow.orders.cancelled.dlq"    1 2592000000   # 30 days
 
 echo "[ticketflow] topics now on the broker:"
 "${KAFKA_BIN}/kafka-topics.sh" --bootstrap-server "${BOOTSTRAP}" --list | sed 's/^/  - /'

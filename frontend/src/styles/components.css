@@ -73,6 +73,32 @@
   font-size: var(--text-sm);
 }
 
+/* Cancelar é irreversível, e o botão diz isso. Usa o mesmo tom dos estados de
+   recusa — a cor já significa "acabou mal" no resto da interface. */
+.btn-danger {
+  background: var(--accent-500);
+  border-color: var(--accent-500);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+/* A área de cancelamento fica separada do resto do canhoto por uma linha: é a
+   única ação destrutiva da tela e não deve encostar no que é informativo. */
+.cancel-area {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Voltar: seta discreta, mas com alvo de clique de gente. */
 .back {
   display: inline-flex;

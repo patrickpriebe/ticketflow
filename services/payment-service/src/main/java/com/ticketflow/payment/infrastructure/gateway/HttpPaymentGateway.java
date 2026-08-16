@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,6 +51,74 @@ public class HttpPaymentGateway implements PaymentGateway {
             record(AuthorizationResponse.errored(rootMessage(e), null, elapsedMs(startedAt), null), startedAt);
             throw e;
         }
+    }
+
+    /**
+     * Estorno no gateway simulado.
+     *
+     * <p>Mesma leitura de status da autorização, com uma diferença que importa:
+     * {@code 4xx} aqui é <strong>recusa definitiva</strong> e {@code 5xx} ou
+     * timeout é <strong>indisponibilidade</strong>. Confundir os dois custa caro
+     * nas duas direções — tratar recusa como indisponível tenta devolver o
+     * dinheiro para sempre, e tratar indisponível como recusa deixa o cliente
+     * sem o dinheiro dele.
+     */
+    @Override
+    public RefundResponse refund(RefundRequest request) {
+        long startedAt = System.nanoTime();
+        try {
+            ResponseEntity<String> response = restClient.post()
+                    .uri("/refunds")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    // A mesma chave da cobrança: uma reentrega do ORDER_CANCELLED
+                    // não pode virar dois estornos.
+                    .header("Idempotency-Key", "refund-" + request.idempotencyKey())
+                    .body(Map.of(
+                            "transactionId", request.transactionId(),
+                            "amount", request.amount(),
+                            "currency", request.currency()))
+                    .retrieve()
+                    .onStatus(status -> true, (req, res) -> {
+                    })
+                    .toEntity(String.class);
+
+            int latency = elapsedMs(startedAt);
+            HttpStatusCode status = response.getStatusCode();
+
+            if (status.is2xxSuccessful()) {
+                JsonNode body = parse(response.getBody());
+                String refundId = text(body, "refundId");
+                if (refundId == null || refundId.isBlank()) {
+                    // Sem comprovante não dá para afirmar que devolveu.
+                    return RefundResponse.unavailable(
+                            "provedor respondeu sem refundId", status.value());
+                }
+                recordRefund("REFUNDED", startedAt);
+                return RefundResponse.refunded(refundId, status.value());
+            }
+
+            if (status.is4xxClientError()) {
+                recordRefund("DECLINED", startedAt);
+                return RefundResponse.declined(
+                        "provedor recusou o estorno: " + response.getBody(), status.value());
+            }
+
+            recordRefund("UNAVAILABLE", startedAt);
+            return RefundResponse.unavailable("provedor indisponivel", status.value());
+
+        } catch (RuntimeException e) {
+            log.warn("Estorno falhou para o pagamento {}", request.paymentId(), e);
+            recordRefund("UNAVAILABLE", startedAt);
+            return RefundResponse.unavailable(rootMessage(e), null);
+        }
+    }
+
+    private void recordRefund(String outcome, long startedAt) {
+        Timer.builder("ticketflow.payment.gateway.refunds")
+                .description("Refund calls to the external payment provider")
+                .tag("outcome", outcome)
+                .register(registry)
+                .record(System.nanoTime() - startedAt, TimeUnit.NANOSECONDS);
     }
 
     /**

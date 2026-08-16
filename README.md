@@ -700,12 +700,11 @@ Recorded so they do not look like oversights.
 - **Card payments require the browser.** PIX and boleto settle through the webhook;
   card needs Stripe Elements, which is implemented, but there is no server-side
   fallback for a customer who closes the page mid-confirmation.
-- **Cancellation does not refund yet.** `POST /orders/{id}/cancel` exists, releases the
-  reserved tickets and publishes `ORDER_CANCELLED`, and the Order Service already
-  absorbs an approval that arrives for a closed order instead of dying on an illegal
-  transition. What is missing is the other half: the Payment Service consuming that
-  event to refund a card that was already charged. Until then the compensation is
-  triggered but never carried out.
+- **Refunds are not visible to the customer.** The money goes back — the Payment
+  Service consumes `ORDER_CANCELLED` and refunds — but the order screen only says
+  *cancelled*; it does not show that a charge was reversed, and no e-mail is sent.
+  The record exists in `payments.refund_id`, which is enough for support and not
+  enough for the person who paid.
 - **Nothing is rate limited.** An authenticated customer can place orders in a loop and
   hold real inventory for the length of the payment window. The expiry sweep bounds the
   damage rather than preventing it, and the fix belongs at the edge (Render, or a

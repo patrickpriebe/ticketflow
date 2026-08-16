@@ -3,6 +3,7 @@ package com.ticketflow.payment.infrastructure.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow.payment.application.port.in.FindOrderPaymentUseCase;
 import com.ticketflow.payment.application.port.in.ProcessOrderPaymentUseCase;
+import com.ticketflow.payment.application.port.in.RefundCancelledOrderUseCase;
 import com.ticketflow.payment.application.port.out.DomainEventPublisher;
 import com.ticketflow.payment.application.port.out.PaymentGateway;
 import com.ticketflow.payment.application.port.out.PaymentIntentReader;
@@ -15,6 +16,7 @@ import com.ticketflow.payment.application.strategy.PaymentStrategies;
 import com.ticketflow.payment.application.strategy.PixPaymentStrategy;
 import com.ticketflow.payment.application.usecase.FindOrderPayment;
 import com.ticketflow.payment.application.usecase.ProcessOrderPayment;
+import com.ticketflow.payment.application.usecase.RefundCancelledOrder;
 import com.stripe.StripeClient;
 import com.ticketflow.payment.application.port.in.SettlePaymentFromProviderUseCase;
 import com.ticketflow.payment.application.port.out.WebhookEventRepository;
@@ -160,5 +162,22 @@ public class ApplicationConfiguration {
             @Value("${ticketflow.gateway.name}") String gatewayName) {
         return new ProcessOrderPayment(payments, gateway, strategies, eventPublisher,
                 processedEvents, unitOfWork, clock, gatewayName);
+    }
+
+    /**
+     * A outra metade do cancelamento de pedido.
+     *
+     * <p>Não publica evento nenhum: quem cancelou já sabe, e o Order Service não
+     * espera resposta. Inventar um evento de volta criaria um acoplamento que o
+     * fluxo não pede.
+     */
+    @Bean
+    public RefundCancelledOrderUseCase refundCancelledOrderUseCase(
+            PaymentRepository payments,
+            PaymentGateway gateway,
+            ProcessedEventRepository processedEvents,
+            UnitOfWork unitOfWork,
+            Clock clock) {
+        return new RefundCancelledOrder(payments, gateway, processedEvents, unitOfWork, clock);
     }
 }

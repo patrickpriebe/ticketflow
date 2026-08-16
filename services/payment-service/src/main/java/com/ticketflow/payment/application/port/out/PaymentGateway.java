@@ -22,6 +22,68 @@ public interface PaymentGateway {
     AuthorizationResponse authorize(AuthorizationRequest request);
 
     /**
+     * Devolve o dinheiro de uma cobrança que já saiu.
+     *
+     * <p>Como {@code authorize}, não lança por desfecho de negócio — mas a
+     * distinção aqui é mais delicada. "O provedor recusou o estorno" e "o
+     * provedor não respondeu" precisam ser separáveis: o primeiro é definitivo
+     * e alguém tem que olhar; o segundo pede nova tentativa, e tratar os dois
+     * igual ou deixa dinheiro sem devolver ou tenta devolver para sempre.
+     */
+    RefundResponse refund(RefundRequest request);
+
+    /**
+     * @param idempotencyKey o id da cobrança, estável entre retentativas. É o que
+     *                       impede que uma reentrega do ORDER_CANCELLED devolva o
+     *                       dinheiro duas vezes.
+     * @param transactionId  a cobrança original no provedor
+     */
+    record RefundRequest(UUID paymentId,
+                         String idempotencyKey,
+                         String transactionId,
+                         java.math.BigDecimal amount,
+                         String currency) {
+
+        public RefundRequest {
+            Objects.requireNonNull(paymentId, "paymentId is required");
+            Objects.requireNonNull(idempotencyKey, "idempotencyKey is required");
+            Objects.requireNonNull(transactionId, "transactionId is required");
+            Objects.requireNonNull(amount, "amount is required");
+            Objects.requireNonNull(currency, "currency is required");
+        }
+    }
+
+    record RefundResponse(RefundOutcome outcome,
+                          String refundId,
+                          String failureReason,
+                          Integer httpStatus) {
+
+        public RefundResponse {
+            Objects.requireNonNull(outcome, "outcome is required");
+        }
+
+        public static RefundResponse refunded(String refundId, int httpStatus) {
+            return new RefundResponse(RefundOutcome.REFUNDED, refundId, null, httpStatus);
+        }
+
+        /** O provedor respondeu que não vai estornar. Não adianta insistir. */
+        public static RefundResponse declined(String reason, Integer httpStatus) {
+            return new RefundResponse(RefundOutcome.DECLINED, null, reason, httpStatus);
+        }
+
+        /** Sem resposta utilizável. Vale tentar de novo. */
+        public static RefundResponse unavailable(String reason, Integer httpStatus) {
+            return new RefundResponse(RefundOutcome.UNAVAILABLE, null, reason, httpStatus);
+        }
+    }
+
+    enum RefundOutcome {
+        REFUNDED,
+        DECLINED,
+        UNAVAILABLE
+    }
+
+    /**
      * @param idempotencyKey sent to the provider so a retried call cannot charge the
      *                       customer twice. It is the payment id, which is stable
      *                       across retries of the same payment.

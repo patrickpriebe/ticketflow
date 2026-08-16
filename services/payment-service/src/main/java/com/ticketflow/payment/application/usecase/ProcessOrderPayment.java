@@ -15,6 +15,7 @@ import com.ticketflow.payment.domain.exception.PaymentGatewayUnavailableExceptio
 import com.ticketflow.payment.domain.model.AttemptOutcome;
 import com.ticketflow.payment.domain.model.Payment;
 import com.ticketflow.payment.domain.model.PaymentAttempt;
+import com.ticketflow.payment.domain.model.PaymentStatus;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -92,6 +93,22 @@ public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
         AuthorizationResponse response = gateway.authorize(request);
         // -------------------------------------------
 
+        // O pedido pode ter sido cancelado enquanto a cobrança estava em voo. O
+        // `payment` em memória ainda diz PENDING, mas a linha no banco já é
+        // CANCELLED — e o dinheiro acabou de sair.
+        //
+        // Sem este ramo o desfecho é o pior possível e silencioso: o `update`
+        // abaixo esbarra no lock otimista, a mensagem é reentregue, a segunda
+        // entrega encontra a cobrança já resolvida e devolve ALREADY_SETTLED sem
+        // chamar o provedor. Ninguém erra, ninguém reclama, e o cartão fica
+        // cobrado de um pedido cancelado.
+        //
+        // Estornar aqui é possível porque este ponto está fora de transação, que
+        // é exatamente o que uma chamada externa exige.
+        if (response.outcome() == AttemptOutcome.APPROVED && cancelledMeanwhile(command)) {
+            return refundChargeForCancelledOrder(command, payment, response);
+        }
+
         Result result = unitOfWork.execute(() -> settle(command, payment, response, strategy));
 
         if (result == null) {
@@ -100,6 +117,44 @@ public class ProcessOrderPayment implements ProcessOrderPaymentUseCase {
             throw new PaymentGatewayUnavailableException(command.orderId(), response.failureReason());
         }
         return result;
+    }
+
+    /** Relê a cobrança para ver se o cancelamento passou por aqui nesse meio-tempo. */
+    private boolean cancelledMeanwhile(Command command) {
+        return payments.findByOrderId(command.orderId())
+                .map(current -> current.status() == PaymentStatus.CANCELLED)
+                .orElse(false);
+    }
+
+    /**
+     * Devolve o que acabou de ser cobrado de um pedido que já não existe.
+     *
+     * <p>A cobrança fica {@code CANCELLED} com o id do estorno junto: o dinheiro
+     * saiu e voltou, e as duas coisas precisam estar registradas. Se o provedor
+     * não devolver, nada é marcado e a mensagem volta — insistir é o certo aqui,
+     * porque a alternativa é ficar com dinheiro que não é nosso.
+     */
+    private Result refundChargeForCancelledOrder(Command command, Payment payment,
+                                                 AuthorizationResponse response) {
+        PaymentGateway.RefundResponse refund = gateway.refund(new PaymentGateway.RefundRequest(
+                payment.id(),
+                payment.id().toString(),
+                response.transactionId(),
+                payment.amount().amount(),
+                payment.amount().currency()));
+
+        if (refund.outcome() == PaymentGateway.RefundOutcome.UNAVAILABLE) {
+            throw new PaymentGatewayUnavailableException(command.orderId(), refund.failureReason());
+        }
+
+        return unitOfWork.execute(() -> {
+            Payment current = payments.findByOrderId(command.orderId()).orElseThrow();
+            current.recordRefundOfCancelledOrder(response.transactionId(), refund.refundId(),
+                    gatewayName, clock.instant());
+            payments.update(current);
+            processedEvents.record(command.eventId());
+            return Result.ALREADY_SETTLED;
+        });
     }
 
     private Payment findOrCreate(Command command) {

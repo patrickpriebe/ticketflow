@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listTickets, type Order, type OrderStatus, type Ticket } from '../api';
+import { cancelOrder, listTickets, ProblemError, type Order, type OrderStatus, type Ticket } from '../api';
 import { CardPayment } from '../components/CardPayment';
 import { Countdown } from '../components/Countdown';
 import { Icon } from '../components/Icon';
@@ -58,7 +58,37 @@ const STATUS: Record<OrderStatus, { label: string; headline: string; hint: strin
 
 export function OrderPage({ order, error }: Props) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const paid = order?.status === 'PAID';
+
+  /**
+   * Cancelar não pede confirmação por rigor de processo, e sim porque é
+   * irreversível: o pedido não volta, e os ingressos podem ter acabado no
+   * intervalo.
+   *
+   * O 409 é tratado como sucesso silencioso de propósito. Ele significa que o
+   * pedido já tinha acabado — quase sempre porque o pagamento chegou enquanto a
+   * pessoa decidia. Mostrar "erro" aí seria culpar o cliente por uma corrida do
+   * sistema; a tela se atualiza sozinha e o estado novo aparece.
+   */
+  async function handleCancel(orderId: string) {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelOrder(orderId);
+      setConfirming(false);
+    } catch (e) {
+      if (e instanceof ProblemError && e.status === 409) {
+        setConfirming(false);
+      } else {
+        setCancelError(e instanceof Error ? e.message : 'Não foi possível cancelar');
+      }
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   // Os ingressos só existem depois que o pagamento é aprovado, e são emitidos por
   // outro serviço — buscar antes disso seria pedir algo que ainda não foi criado.
@@ -146,6 +176,49 @@ export function OrderPage({ order, error }: Props) {
               <span className="muted small">
                 Depois disso os ingressos voltam para o estoque.
               </span>
+            </div>
+          )}
+
+          {/* Desistir só faz sentido enquanto ninguém foi cobrado. Depois de
+              pago o caminho é outro — estorno —, com outras regras. */}
+          {order.status === 'PENDING' && (
+            <div className="cancel-area">
+              {confirming ? (
+                <div className="stack-sm">
+                  <p className="muted small">
+                    Cancelar libera seus ingressos para outras pessoas, e isso não
+                    tem volta. Se a cobrança já tiver saído, o valor é devolvido.
+                  </p>
+                  <div className="row">
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => handleCancel(order.id)}
+                      disabled={cancelling}
+                    >
+                      {cancelling ? 'Cancelando…' : 'Sim, cancelar pedido'}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setConfirming(false)}
+                      disabled={cancelling}
+                    >
+                      Manter pedido
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirming(true)}>
+                  <Icon name="close" size={15} />
+                  Cancelar pedido
+                </button>
+              )}
+
+              {cancelError && (
+                <p className="alert" style={{ marginTop: 'var(--space-3)' }}>
+                  <Icon name="close" size={16} />
+                  {cancelError}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -36,6 +36,8 @@ public class Payment {
     private int attempts;
     private Instant authorizedAt;
     private Instant updatedAt;
+    /** Id do estorno no provedor. Só existe depois de uma devolução. */
+    private String refundId;
 
     private final List<PaymentAttempt> newAttempts = new ArrayList<>();
 
@@ -66,7 +68,8 @@ public class Payment {
                                   String gatewayName, String gatewayTransactionId,
                                   String failureCode, String failureReason,
                                   int attempts, Instant authorizedAt,
-                                  Instant createdAt, Instant updatedAt, long version) {
+                                  Instant createdAt, Instant updatedAt, long version,
+                                  String refundId) {
         Payment payment = new Payment(id, orderId, customerId, amount, method, status,
                 attempts, createdAt, updatedAt, version);
         payment.gatewayName = gatewayName;
@@ -74,6 +77,7 @@ public class Payment {
         payment.failureCode = failureCode;
         payment.failureReason = failureReason;
         payment.authorizedAt = authorizedAt;
+        payment.refundId = refundId;
         return payment;
     }
 
@@ -159,8 +163,108 @@ public class Payment {
         }
     }
 
+    /**
+     * Uma cobrança que já nasce cancelada.
+     *
+     * <p>Existe para o cruzamento mais perigoso do cancelamento: o
+     * {@code ORDER_CANCELLED} chegar <strong>antes</strong> do
+     * {@code ORDER_CREATED}. Sem esta linha, o consumidor do pedido criaria a
+     * cobrança depois e cobraria o cartão de alguém que já tinha desistido — e
+     * ninguém estornaria, porque o evento de cancelamento já teria sido
+     * consumido e marcado.
+     *
+     * <p>A restrição {@code UNIQUE (order_id)} é o que faz isso funcionar: o
+     * {@code ProcessOrderPayment} procura a cobrança do pedido antes de criar,
+     * encontra esta, vê que já está resolvida e não chama o provedor.
+     */
+    public static Payment cancelledBeforeCharge(UUID orderId, UUID customerId, Money amount,
+                                                PaymentMethod method, String reason, Instant now) {
+        Payment payment = new Payment(UUID.randomUUID(), orderId, customerId, amount, method,
+                PaymentStatus.CANCELLED, 0, now, now, 0L);
+        payment.failureCode = "ORDER_CANCELLED";
+        payment.failureReason = reason;
+        return payment;
+    }
+
+    /**
+     * O pedido foi cancelado e nada tinha sido cobrado ainda.
+     *
+     * <p>Nenhuma chamada ao provedor acontece por causa disto: não há o que
+     * desfazer. O que a transição garante é que uma entrega atrasada do
+     * {@code ORDER_CREATED} não reabra a cobrança depois.
+     */
+    public void cancelBeforeCharge(String reason, Instant now) {
+        Objects.requireNonNull(now, "now is required");
+        if (!status.canTransitionTo(PaymentStatus.CANCELLED)) {
+            throw new InvalidPaymentStatusTransitionException(status, PaymentStatus.CANCELLED);
+        }
+        this.status = PaymentStatus.CANCELLED;
+        this.failureCode = "ORDER_CANCELLED";
+        this.failureReason = reason;
+        this.updatedAt = now;
+    }
+
+    /**
+     * O dinheiro voltou.
+     *
+     * <p>Só sai de {@link PaymentStatus#APPROVED}, e o id do estorno é
+     * obrigatório: sem ele não há como provar depois que a devolução aconteceu,
+     * e "estornei" sem comprovante é exatamente o tipo de afirmação que uma
+     * disputa derruba.
+     *
+     * <p>O {@code gatewayTransactionId} da cobrança original é preservado de
+     * propósito — ele é o que liga o estorno ao que foi cobrado.
+     */
+    public void markRefunded(String refundId, Instant now) {
+        Objects.requireNonNull(now, "now is required");
+        if (refundId == null || refundId.isBlank()) {
+            throw new IllegalArgumentException("Um estorno precisa do id devolvido pelo provedor");
+        }
+        if (!status.canTransitionTo(PaymentStatus.REFUNDED)) {
+            throw new InvalidPaymentStatusTransitionException(status, PaymentStatus.REFUNDED);
+        }
+        this.status = PaymentStatus.REFUNDED;
+        this.refundId = refundId;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Foi cobrado por engano e já devolvido, sem nunca ter chegado a APPROVED.
+     *
+     * <p>É o registro do cruzamento em que o cancelamento passou enquanto a
+     * cobrança estava a caminho do provedor. O status continua
+     * {@link PaymentStatus#CANCELLED} porque é isso que aconteceu com o pedido;
+     * o que muda é que agora existe prova de que o dinheiro saiu e voltou.
+     *
+     * <p>Guardar as duas pontas é o ponto: só o {@code refundId} diria que houve
+     * devolução sem dizer de quê, e só a transação diria que houve cobrança sem
+     * dizer que ela foi desfeita.
+     */
+    public void recordRefundOfCancelledOrder(String transactionId, String refundId,
+                                             String gatewayName, Instant now) {
+        Objects.requireNonNull(now, "now is required");
+        if (status != PaymentStatus.CANCELLED) {
+            throw new InvalidPaymentStatusTransitionException(status, PaymentStatus.CANCELLED);
+        }
+        if (refundId == null || refundId.isBlank()) {
+            throw new IllegalArgumentException("Um estorno precisa do id devolvido pelo provedor");
+        }
+        this.gatewayName = gatewayName;
+        this.gatewayTransactionId = transactionId;
+        this.refundId = refundId;
+        this.updatedAt = now;
+    }
+
     public boolean isApproved() {
         return status == PaymentStatus.APPROVED;
+    }
+
+    public boolean isRefunded() {
+        return status == PaymentStatus.REFUNDED;
+    }
+
+    public String refundId() {
+        return refundId;
     }
 
     public boolean isSettled() {

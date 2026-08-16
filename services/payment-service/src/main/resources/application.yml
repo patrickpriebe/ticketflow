@@ -26,7 +26,9 @@ spring:
 
   cloud:
     function:
-      definition: orderCreated
+      # Dois consumidores independentes. O ";" é como o Spring Cloud Stream
+      # separa funções — não é uma cadeia, são dois bindings separados.
+      definition: orderCreated;orderCancelled
     stream:
       bindings:
         orderCreated-in-0:
@@ -46,6 +48,15 @@ spring:
           consumer:
             max-attempts: 3
             back-off-initial-interval: 2000
+        orderCancelled-in-0:
+          destination: ticketflow.orders.cancelled
+          # Grupo próprio: é outro consumidor, com outro ritmo e outro destino de
+          # DLQ. Compartilhar o grupo do orderCreated faria o Kafka entregar cada
+          # mensagem a só um dos dois.
+          group: payment-service-cancel${TICKETFLOW_GROUP_SUFFIX:}
+          consumer:
+            max-attempts: 3
+            back-off-initial-interval: 2000
         paymentProcessed-out-0:
           destination: ticketflow.payments.processed
       kafka:
@@ -58,6 +69,25 @@ spring:
             consumer:
               enable-dlq: true
               dlq-name: ticketflow.orders.created.dlq
+              # As DLQ tem UMA particao e os topicos de origem tem tres. Sem isto
+              # o binder tenta escrever na mesma particao de onde leu, e uma
+              # mensagem vinda da particao 1 ou 2 morre com "partition N is not
+              # present in metadata" - a mensagem envenenada se perde justamente
+              # no mecanismo que existe para nao perde-la.
+              dlq-partitions: 1
+          orderCancelled-in-0:
+            consumer:
+              # DLQ própria. Um cancelamento que não pôde ser aplicado é o tipo
+              # de mensagem que alguém precisa ver individualmente — pode ser
+              # dinheiro parado no lugar errado.
+              enable-dlq: true
+              dlq-name: ticketflow.orders.cancelled.dlq
+              # As DLQ tem UMA particao e os topicos de origem tem tres. Sem isto
+              # o binder tenta escrever na mesma particao de onde leu, e uma
+              # mensagem vinda da particao 1 ou 2 morre com "partition N is not
+              # present in metadata" - a mensagem envenenada se perde justamente
+              # no mecanismo que existe para nao perde-la.
+              dlq-partitions: 1
 
 server:
   port: 8082

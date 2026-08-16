@@ -1,0 +1,19 @@
+{
+  "name": "refund approved (default)",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPath": "/refunds"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "refunded",
+      "refundId": "re_{{randomValue length=24 type='ALPHANUMERIC'}}"
+    },
+    "transformers": ["response-template"]
+  }
+}

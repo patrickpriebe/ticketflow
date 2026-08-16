@@ -97,6 +97,11 @@ public class OutboxEventPublisher implements DomainEventPublisher {
         // chamada síncrona entre serviços que este projeto não admite.
         data.put("totalAmount", order.totalAmount().amount());
         data.put("currency", order.totalAmount().currency());
+        // O método viaja pelo mesmo motivo, e resolve um caso específico: quando o
+        // cancelamento chega ANTES do ORDER_CREATED, o Payment Service registra a
+        // cobrança já cancelada para que ela nunca seja feita — e uma cobrança,
+        // mesmo natimorta, precisa dizer por qual meio seria.
+        data.put("paymentMethod", order.paymentMethod().name());
 
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("eventId", event.eventId().toString());

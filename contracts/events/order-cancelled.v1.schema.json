@@ -11,7 +11,7 @@
     "producer": { "const": "order-service" },
     "data": {
       "type": "object",
-      "required": ["orderId", "customerId", "reason", "totalAmount", "currency"],
+      "required": ["orderId", "customerId", "reason", "totalAmount", "currency", "paymentMethod"],
       "additionalProperties": false,
       "properties": {
         "orderId": { "type": "string", "format": "uuid" },
@@ -26,7 +26,12 @@
           "minimum": 0,
           "description": "The full order amount. The upper bound of what may need refunding - the Payment Service refunds what it actually captured, never more."
         },
-        "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["CREDIT_CARD", "PIX", "BOLETO"],
+          "description": "Needed for the case where this event arrives before ORDER_CREATED: the Payment Service records an already-cancelled charge so it can never be made, and a charge - even a stillborn one - has to say by which method."
+        }
       }
     }
   },
@@ -43,7 +48,8 @@
         "customerId": "3f1c9a6e-77b2-4c0d-9f31-2a5b8e4d6c10",
         "reason": "Cancelled by the customer",
         "totalAmount": 1300.00,
-        "currency": "BRL"
+        "currency": "BRL",
+        "paymentMethod": "CREDIT_CARD"
       }
     }
   ]

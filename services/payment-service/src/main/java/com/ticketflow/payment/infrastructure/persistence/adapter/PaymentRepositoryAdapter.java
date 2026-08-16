@@ -61,7 +61,7 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
 
         entity.applyOutcome(payment.status(), payment.gatewayName(), payment.gatewayTransactionId(),
                 payment.failureCode(), payment.failureReason(), payment.attempts(),
-                payment.authorizedAt(), payment.updatedAt());
+                payment.authorizedAt(), payment.updatedAt(), payment.refundId());
 
         for (PaymentAttempt attempt : payment.newAttempts()) {
             entity.addAttempt(new PaymentAttemptEntity(
@@ -73,11 +73,20 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     private PaymentEntity toEntity(Payment payment) {
-        return new PaymentEntity(
+        PaymentEntity entity = new PaymentEntity(
                 payment.id(), payment.orderId(), payment.customerId(),
                 payment.amount().amount(), payment.amount().currency(),
                 payment.method(), payment.status(), payment.attempts(),
                 payment.createdAt(), payment.updatedAt());
+
+        // O construtor só carrega o essencial de uma cobrança nova. Uma que já
+        // nasce cancelada — porque o cancelamento correu na frente do
+        // ORDER_CREATED — traz motivo junto, e perder isso deixaria uma linha
+        // CANCELLED sem dizer por quê.
+        entity.applyOutcome(payment.status(), payment.gatewayName(), payment.gatewayTransactionId(),
+                payment.failureCode(), payment.failureReason(), payment.attempts(),
+                payment.authorizedAt(), payment.updatedAt(), payment.refundId());
+        return entity;
     }
 
     private static Payment toDomain(PaymentEntity entity) {
@@ -88,6 +97,7 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
                 entity.getGatewayName(), entity.getGatewayTransactionId(),
                 entity.getFailureCode(), entity.getFailureReason(),
                 entity.getAttempts(), entity.getAuthorizedAt(),
-                entity.getCreatedAt(), entity.getUpdatedAt(), entity.getVersion());
+                entity.getCreatedAt(), entity.getUpdatedAt(), entity.getVersion(),
+                entity.getRefundId());
     }
 }

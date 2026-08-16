@@ -168,6 +168,21 @@ The other services copy these choices rather than reinventing them.
   topic. `ticketflow.outbox.bindings` maps topic → binding, and an unmapped topic
   throws instead of silently publishing to the wrong destination — a cancellation
   landing on `orders.created` would have the Payment Service charge a cancelled order.
+- **A cancellation crosses a charge in three ways, and each one is a different fix.**
+  The Payment Service consumes `ORDER_CANCELLED`, and what it does depends on when the
+  event lands. *Before the charge exists* — it writes an already-`CANCELLED` payment,
+  so the later `ORDER_CREATED` finds it settled (via `UNIQUE (order_id)`) and never
+  calls the provider; without that row the card gets charged and nothing refunds it,
+  because the cancellation was already consumed. *After the charge was approved* — it
+  refunds. *While the charge is in flight* — `ProcessOrderPayment` re-reads the payment
+  after the gateway answers and refunds immediately; skip that and the optimistic lock
+  rejects the update, the message is redelivered, the second delivery sees a settled
+  payment and returns `ALREADY_SETTLED` without calling anyone. Nobody errors and the
+  card stays charged for a cancelled order.
+- **The DLQ needs `dlq-partitions: 1` when it has fewer partitions than its source.**
+  The binder writes to the same partition index it read from, so a message from
+  partition 2 of a 3-partition topic dies with "partition 2 is not present in
+  metadata" — the poison message is lost by the very mechanism meant to keep it.
 - **Every append-only support table has a retention window.** `outbox_messages`,
   `processed_events` and `payment_webhook_events` only ever grew. Nothing breaks in a
   day, and that is the trap: the bill arrives months later as a slow query and a full

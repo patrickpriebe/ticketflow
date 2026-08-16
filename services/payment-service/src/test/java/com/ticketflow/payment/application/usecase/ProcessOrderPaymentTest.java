@@ -112,6 +112,49 @@ class ProcessOrderPaymentTest {
     }
 
     @Test
+    @DisplayName("cancelamento que passa durante a cobranca faz o dinheiro voltar na hora")
+    void cancelledWhileChargeWasInFlight() {
+        // A corrida mais cara do cancelamento: o cliente desiste enquanto a
+        // cobrança está a caminho do provedor. O objeto em memória ainda diz
+        // PENDING, a linha no banco já diz CANCELLED, e o cartão acabou de ser
+        // debitado.
+        //
+        // Sem o estorno aqui o desfecho é silencioso e péssimo: o update esbarra
+        // no lock otimista, a mensagem é reentregue, a segunda entrega vê a
+        // cobrança já resolvida e devolve ALREADY_SETTLED sem chamar o provedor.
+        // Ninguém erra e o cartão fica cobrado de um pedido cancelado.
+        Payment inFlight = Payment.forOrder(orderId, UUID.randomUUID(),
+                Money.of("1300.00", "BRL"), PaymentMethod.CREDIT_CARD, NOW);
+        Payment cancelledMeanwhile = Payment.forOrder(orderId, inFlight.customerId(),
+                Money.of("1300.00", "BRL"), PaymentMethod.CREDIT_CARD, NOW);
+        cancelledMeanwhile.cancelBeforeCharge("Cancelled by the customer", NOW);
+
+        when(payments.findByOrderId(orderId))
+                // 1ª: a cobrança ainda não existe, então é criada
+                .thenReturn(Optional.empty())
+                // 2ª: a releitura depois do gateway já encontra o cancelamento
+                .thenReturn(Optional.of(cancelledMeanwhile))
+                // 3ª: dentro da transação que grava o estorno
+                .thenReturn(Optional.of(cancelledMeanwhile));
+        when(payments.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+        when(gateway.authorize(any())).thenReturn(
+                AuthorizationResponse.approved("ch_123", 201, 140, "{}"));
+        when(gateway.refund(any())).thenReturn(
+                PaymentGateway.RefundResponse.refunded("re_777", 200));
+
+        processOrderPayment.execute(command(PaymentMethod.CREDIT_CARD));
+
+        verify(gateway).refund(any());
+        // As duas pontas ficam registradas: saiu e voltou.
+        assertThat(cancelledMeanwhile.gatewayTransactionId()).isEqualTo("ch_123");
+        assertThat(cancelledMeanwhile.refundId()).isEqualTo("re_777");
+        assertThat(cancelledMeanwhile.status()).isEqualTo(PaymentStatus.CANCELLED);
+        // Nada de PAGAMENTO_APROVADO: não houve pagamento que valesse.
+        verify(eventPublisher, never()).publish(any());
+        verify(processedEvents).record(eventId);
+    }
+
+    @Test
     @DisplayName("a declined charge announces PAGAMENTO_RECUSADO with the reason")
     void rejected() {
         givenNewPayment();

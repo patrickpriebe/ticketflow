@@ -10,6 +10,7 @@ Formal schemas in [`contracts/events/`](../contracts/events/).
 | `ticketflow.payments.processed` | 3 | 7 days | payment-service | order-service, notification-service |
 | `ticketflow.orders.cancelled` | 3 | 7 days | order-service | payment-service |
 | `ticketflow.orders.created.dlq` | 1 | 30 days | consumers | nobody (manual inspection) |
+| `ticketflow.orders.cancelled.dlq` | 1 | 30 days | consumers | nobody (manual inspection) |
 | `ticketflow.payments.processed.dlq` | 1 | 30 days | consumers | nobody (manual inspection) |
 
 **Message key: always the `orderId`.** Every event about one order lands in the same
