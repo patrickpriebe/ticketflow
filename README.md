@@ -141,7 +141,7 @@ flowchart TB
         MG[("MongoDB<br/>tickets · Atlas")]
     end
 
-    K{{"Kafka · Redpanda<br/>orders.created<br/>payments.processed"}}
+    K{{"Kafka · Redpanda<br/>orders.created<br/>orders.cancelled<br/>payments.processed"}}
     ST["Stripe"]
     GO["Google<br/>identity provider"]
 
