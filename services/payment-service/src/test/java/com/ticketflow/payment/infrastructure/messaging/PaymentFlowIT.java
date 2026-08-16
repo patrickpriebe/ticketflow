@@ -45,18 +45,33 @@ import static org.awaitility.Awaitility.await;
 @SpringBootTest(properties = {
         "ticketflow.outbox.scheduling-enabled=false",
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
-        "spring.cloud.stream.kafka.bindings.orderCreated-in-0.consumer.start-offset=earliest"
+        "spring.cloud.stream.kafka.bindings.orderCreated-in-0.consumer.start-offset=earliest",
+        // Sem isto o contexto nem sobe: o SecurityConfiguration derruba o boot
+        // quando não há issuer nem segredo, e é para fazer exatamente isso.
+        //
+        // Esta linha faltava desde que a camada de autenticação entrou neste
+        // serviço, junto com o endpoint que devolve o client_secret para o
+        // Stripe Elements — o IT é anterior a ela e ninguém voltou aqui. O CI
+        // ficou vermelho desde então, e passou despercebido porque `mvnw test`
+        // só roda os unitários; quem exercita isto é o `verify`.
+        "ticketflow.auth.secret=segredo-de-teste-com-mais-de-32-caracteres"
 })
 @EmbeddedKafka(partitions = 1, topics = {
         PaymentFlowIT.ORDERS_CREATED,
         PaymentFlowIT.ORDERS_DLQ,
-        PaymentFlowIT.PAYMENTS_PROCESSED
+        PaymentFlowIT.PAYMENTS_PROCESSED,
+        // O consumidor de cancelamento é novo, e o binder tem
+        // `auto-create-topics: false` — um tópico não declarado aqui não nasce.
+        PaymentFlowIT.ORDERS_CANCELLED,
+        PaymentFlowIT.ORDERS_CANCELLED_DLQ
 })
 class PaymentFlowIT extends PaymentServiceIT {
 
     static final String ORDERS_CREATED = "ticketflow.orders.created";
     static final String ORDERS_DLQ = "ticketflow.orders.created.dlq";
     static final String PAYMENTS_PROCESSED = "ticketflow.payments.processed";
+    static final String ORDERS_CANCELLED = "ticketflow.orders.cancelled";
+    static final String ORDERS_CANCELLED_DLQ = "ticketflow.orders.cancelled.dlq";
 
     @Autowired
     private OutboxRelay outboxRelay;
