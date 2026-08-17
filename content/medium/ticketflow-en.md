@@ -214,7 +214,7 @@ state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
 
 **Prefer bugs that fail loudly.** Almost every defect here was dangerous in proportion to how quietly it failed. The routing bug, the in-flight cancellation, the empty Grafana panel — none of them threw. The ones that crashed were fixed in minutes.
 
-**Run it, don't just test it.** The QR bug, the missing refund endpoint and the DLQ partition mismatch were all invisible to unit tests and obvious within seconds of using the thing. The same blind spot covers environment parity: my dev proxy routed **two** services while the deployed config routed **three**, so locally every call to the Payment Service fell through to the Order Service and answered `500`. A test suite has no opinion about whether your two environments agree with each other.
+**Run it, don't just test it.** The QR bug, the missing refund endpoint and the DLQ partition mismatch were all invisible to unit tests and obvious within seconds of using the thing. So was the gap between my two environments: the dev proxy routed **two** services while the deployed config routed **three**, so locally every call to the Payment Service fell through to the Order Service and answered `500`. A test suite has no opinion about whether your environments agree with each other.
 
 **Say what doesn't work.** My README has a *Known limits* section: no rate limiting, no e-mail when a refund goes through, the QR is decorative. A portfolio that claims to be finished is less credible than one that knows exactly where it stops.
 
