@@ -92,11 +92,21 @@ server-side cart would have to hold seats for an indefinite time for everyone wh
 the page — the kind of thing that looks like care and turns into stuck inventory. It
 lives in `sessionStorage` so it survives a refresh mid-checkout.
 
-**Posters are drawn, not photographed.** The catalogue has no images, and adding an
-`imageUrl` field to the contract just so the frontend could look better would be the
-tail wagging the dog: with nowhere to host and no upload flow, the field would be born
-empty. Each event gets an SVG derived from its own id — always the same face, a varied
-grid, zero bytes over the network.
+**Real photographs of the venues, with a drawn poster as the fallback.** The events are
+fictional, so there is no photo of *that* show — but the venues they name are real
+places, and those are photographable. The images are freely licensed shots from Wikimedia
+Commons, served by the site itself rather than hotlinked: the CSP closes `img-src` to
+`'self'`, and a card losing its image because a third party went down is a failure that
+need not exist.
+
+Two rules decide which photo is usable. The Creative Commons licence settles the
+photographer's rights, and the credit line on the event page pays that. **It does not
+settle the rights of people who appear in the frame** — that belongs to each person and
+is not resolved by attribution. So an empty venue qualifies and a shot full of faces does
+not; where only crowd photos existed, the event keeps the drawn poster.
+
+The generative SVG stayed for exactly that reason, plus one more: any event added after
+the seed has no photo, and it is also what covers a file that fails to load.
 
 **Card data is collected by Stripe, not by us.** The card field is an iframe belonging to
 Stripe; the number goes straight to them. Our code only ever touches the `client_secret`,
@@ -111,7 +121,26 @@ to the backend, not to paginate more cleverly in the frontend.
 
 **Polling, not WebSocket.** It is what the contract defines: `POST` answers `202` and the
 client polls `GET /orders/{id}`. The interval stops on its own once the order reaches a
-final state.
+final state — and pauses while the tab is hidden. An abandoned order sits `PENDING` for
+fifteen minutes; at two seconds a request that is some 450 calls nobody will read, which
+on a free instance is CPU taken from someone actually using the site. Returning to the
+tab polls immediately, so nobody sees a stale status.
+
+**Cancelling asks for confirmation, and treats `409` as success.** The button only exists
+while the order is `PENDING` — a paid order is refunded, which is a different flow. The
+confirmation is there because the action is irreversible and the tickets may be gone by
+the time the person changes their mind. A `409` means the order had already finished,
+almost always because the payment landed while they were deciding; showing an error there
+would blame the customer for a race inside the system, so the screen just refreshes into
+the new state.
+
+**The cancelled order says what happened to the money.** Reading the status alone would
+tell someone who was charged that nothing was charged: when a cancellation crosses a
+charge in flight, the money goes out and comes back and the payment stays `CANCELLED` —
+because that is what happened to the *order*. The screen asks the Payment Service
+directly and distinguishes three outcomes: nothing was charged, the amount came back, or
+the refund is still in flight. The proof is `refund_id`, exposed to the browser as a
+boolean; the receipt decides, not the label.
 
 ## Running
 

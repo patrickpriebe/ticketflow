@@ -79,10 +79,15 @@ node scripts/screenshots/capture.mjs
 | ![Home](docs/img/01-home.png) | ![Discover](docs/img/02-discover.png) |
 | **Home.** The catalogue is public — asking for a login before showing what is on sale would cost customers. | **Discover.** Filters by city, price and text, all reflected in the URL so a filtered view can be shared. |
 
-Every event poster is drawn from the event id. The catalogue has no images, and adding
-an `imageUrl` field to the contract just so the frontend could look better would be the
-tail wagging the dog — so each event gets a stable, deterministic SVG instead of a grey
-rectangle.
+The images are real photographs of the venues the catalogue names — Parque Olímpico,
+Theatro Municipal, Sesc Pompeia, Marina da Glória — freely licensed from Wikimedia
+Commons and served by the site itself. The events are fictional, so there is no photo of
+*that* show; the place is what is real.
+
+Only empty venues qualify. The Creative Commons licence settles the photographer's
+rights; it does not settle the rights of people in the frame, and attribution cannot buy
+those. Where only crowd photos existed, the event keeps a poster drawn deterministically
+from its own id — which is also what covers any event added after the seed.
 
 ### Choosing tickets
 
@@ -188,7 +193,7 @@ browser talks to all three; **the services never talk to each other.**
 | Identity | **Google OAuth 2.0** / OIDC | Resource servers validate; nobody issues |
 | Metrics | Micrometer → **Prometheus** → **Grafana** | 11 provisioned panels |
 | Frontend | **React 18** + **TypeScript 5.7** + **Vite 6** | Zero runtime dependencies beyond React |
-| Tests | JUnit 5, Mockito, AssertJ, **WireMock**, **EmbeddedKafka** | 174 tests |
+| Tests | JUnit 5, Mockito, AssertJ, **WireMock**, **EmbeddedKafka** | 205 tests |
 | CI/CD | **GitHub Actions** | Build, test, secret scan, contract lint, image build |
 | Orchestration | **Docker Compose** (local) · **Kubernetes** manifests · **Render** (deployed) | |
 
@@ -265,12 +270,18 @@ Full modelling notes: [docs/02-modelagem-dados.md](docs/02-modelagem-dados.md).
 
 ## Event flow
 
-Two topics, each with a dead-letter queue:
+Three topics, each with a dead-letter queue:
 
 ```
 ticketflow.orders.created       → ticketflow.orders.created.dlq
+ticketflow.orders.cancelled     → ticketflow.orders.cancelled.dlq
 ticketflow.payments.processed   → ticketflow.payments.processed.dlq
 ```
+
+The dead-letter topics have one partition while the business topics have three, so every
+consumer sets `dlq-partitions: 1`. Without it the binder writes to the same partition
+index it read from, and a message from partition 2 dies with *"partition 2 is not present
+in metadata"* — the poison message lost by the mechanism built to keep it.
 
 Every message carries a versioned envelope (`eventId`, `eventType`, `occurredAt`,
 `producer`, `data`), validated by JSON Schema in [`contracts/events/`](contracts/events/).
@@ -462,11 +473,13 @@ Seven routes with real URLs: home, discover, event, checkout, order, my orders, 
   `styles/tokens.css`; no component writes a hex value.
 - **Three-state theming** — light, dark, and *system*. Without the third, whoever chose
   once is stuck with that choice, and almost nobody returns to fix it.
-- **Event posters are drawn from the event id.** The catalogue has no images, and
-  adding an `imageUrl` field to the contract just to make the frontend prettier would be
-  the tail wagging the dog. Each event gets a stable SVG instead of a grey rectangle.
+- **Real venue photographs, with a drawn poster as the fallback.** Freely licensed images
+  of the real places the catalogue names, served by the site itself. Only empty venues
+  qualify: the licence settles the photographer's rights, not the rights of people in the
+  frame, and attribution cannot buy those.
 - **Polling, not WebSocket**, because that is what the contract defines: `POST` answers
-  `202` and the client polls. It stops on its own once the order reaches a final state.
+  `202` and the client polls. It stops on its own once the order reaches a final state,
+  and pauses while the tab is hidden.
 
 The order page exists to make the premise visible: the status starts at *awaiting
 payment* and changes by itself, with nothing on screen ever having blocked on the
@@ -642,7 +655,7 @@ http://localhost:8090/__admin/requests.
 
 ## Testing strategy
 
-**174 tests.** Surefire runs `*Test` (fast, no Docker); Failsafe runs `*IT`.
+**205 tests.** Surefire runs `*Test` (fast, no Docker); Failsafe runs `*IT`.
 
 | Service | Unit | Integration |
 |---|---|---|

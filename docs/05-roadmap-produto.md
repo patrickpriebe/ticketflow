@@ -1,8 +1,14 @@
 # Roadmap — product and frontend
 
-What exists today covers the whole path: discover, choose, pay, receive the ticket and
-follow the order. What is listed here is what **does not exist yet**, organised by how
-much it changes the system — not by how long it takes.
+What exists today covers the whole path: discover, choose, pay, receive the ticket,
+follow the order — and give up on it, with the money coming back. What is listed here is
+what **does not exist yet**, organised by how much it changes the system — not by how
+long it takes.
+
+> Two items left this list once they were built: **cancelling an order** and **refunds**.
+> They turned out to be the same problem — a cancellation and a charge can cross, and the
+> answer is compensation, not locking. See
+> [01-arquitetura.md](01-arquitetura.md#compensation-when-a-cancellation-crosses-a-charge).
 
 Every item states what it demands from the backend. That matters: half of the pretty
 frontend ideas die the moment somebody discovers they need a new table.
@@ -39,14 +45,6 @@ of the artist.
 shows the general text. With two fields in a form nobody notices; with a real form,
 everybody does.
 
-### Cancelling an order
-`CANCELLED` exists as a status and there is no way to reach it from the screen. It is
-the most requested button in any purchase system.
-**Backend:** `POST /orders/{id}/cancel`, releasing inventory in the same transaction and
-publishing the event. The hard part is not the endpoint — it is the race where a
-cancellation and an approval cross, which is a compensation problem (refund), not a
-locking one.
-
 ---
 
 ## Level 2 — Changing what the product can do
@@ -75,11 +73,6 @@ For launches where ten thousand people click in the same second. A queue with a 
 position, a turn token and a per-person purchase window.
 **Backend:** Redis for the queue; it is the first case where a new piece of
 infrastructure genuinely justifies itself.
-
-### Refunds
-A refund is a payment flow of its own, with its own states and the same idempotency
-requirement as the charge. It is where `PaymentStrategy` shows whether it was well
-designed: every method refunds differently.
 
 ---
 

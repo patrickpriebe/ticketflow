@@ -5,7 +5,10 @@ Source files (the migration is always the source of truth, not this document):
 | Where | What |
 |---|---|
 | [`services/order-service/.../V1__init_order_schema.sql`](../services/order-service/src/main/resources/db/migration/V1__init_order_schema.sql) | `ticketflow_orders` schema |
+| [`services/order-service/.../V2__scope_idempotency_key_to_customer.sql`](../services/order-service/src/main/resources/db/migration/V2__scope_idempotency_key_to_customer.sql) | the idempotency key becomes per-customer |
 | [`services/payment-service/.../V1__init_payment_schema.sql`](../services/payment-service/src/main/resources/db/migration/V1__init_payment_schema.sql) | `ticketflow_payments` schema |
+| [`services/payment-service/.../V2__stripe_webhook_inbox.sql`](../services/payment-service/src/main/resources/db/migration/V2__stripe_webhook_inbox.sql) | inbox for provider callbacks |
+| [`services/payment-service/.../V3__refund_and_cancellation.sql`](../services/payment-service/src/main/resources/db/migration/V3__refund_and_cancellation.sql) | `CANCELLED`, `REFUNDED` and `refund_id` |
 | [`services/order-service/.../R__seed_demo_catalogue.sql`](../services/order-service/src/main/resources/db/seed/R__seed_demo_catalogue.sql) | demo catalogue (development only) |
 | [`infra/mongo/init/01-init-notification-db.js`](../infra/mongo/init/01-init-notification-db.js) | `ticketflow_notifications` collections |
 
@@ -35,10 +38,17 @@ events ──1:N──► ticket_categories ◄──N:1── order_items ─�
 showing yesterday's price. If the value came from a `JOIN` with `ticket_categories`, a
 price change would rewrite everybody's history.
 
-**`orders.idempotency_key UNIQUE`.** The client sends an `Idempotency-Key` header. If
-the network drops after the server has already written, the retry hits the constraint
-and returns the original order instead of creating a second one. Without it, a network
-timeout becomes a double charge.
+**`UNIQUE (customer_id, idempotency_key)` — scoped to the customer, and that scope is
+the whole point.** The client sends an `Idempotency-Key` header; a retry hits the
+constraint and returns the original order instead of creating a second one. Without it,
+a network timeout becomes a double charge.
+
+The first version made the key unique across the entire table, and that turned a header
+the client chooses into a way to read someone else's order: `POST /orders` replays the
+order that owns the key, so sending `Idempotency-Key: order-1` — a value two people pick
+without coordinating — answered `200` with a stranger's name, e-mail and purchase. `V2`
+scoped it. The rule that outlives the bug: **looking something up by a client-supplied
+value without scoping it to the caller is an authorisation decision made by accident.**
 
 **`version BIGINT` on `orders` and `ticket_categories`.** JPA optimistic locking. Two
 simultaneous purchases of the last ticket: one wins, the other gets an
@@ -69,11 +79,14 @@ in São Paulo and a server in another timezone cannot disagree about when sales 
                  └── expired without payment ────────► EXPIRED
 ```
 
-Only the arrow into `PENDING` is synchronous. Every other one arrives through Kafka or
-from the expiry job.
+Only the arrow into `PENDING` is synchronous. Every other one arrives through Kafka, from
+the expiry job, or from `POST /orders/{id}/cancel`.
 
-> `CANCELLED` is modelled and reachable in the domain, but no API route leads to it yet.
-> See "Known limits" in the README.
+Cancelling releases the reserved inventory and publishes `ORDER_CANCELLED` in the same
+transaction. It deliberately does **not** wait to find out whether the card was already
+charged — asking would be the synchronous call this architecture forbids. The accepted
+consequence is that a cancelled order may briefly have a charged card, and the answer to
+that is a refund, handled by the Payment Service.
 
 ---
 
@@ -102,6 +115,18 @@ gateway not having said anything useful (timeout, 5xx) — a retry candidate. `A
 is the provider having taken it with the answer coming later, which is the boleto case.
 Collapsing them into one status erases the information that decides what to do next.
 
+**`CANCELLED` and `REFUNDED` are also different things** (`V3`). `CANCELLED` means the
+order ended before any money moved — including the row the service writes *pre-emptively*
+when a cancellation arrives before `ORDER_CREATED`, so the later charge finds it settled
+via `UNIQUE (order_id)` and never calls the provider. `REFUNDED` means money left and
+came back.
+
+**`refund_id`, and the constraint that makes it mandatory.** `CHECK (status <> 'REFUNDED'
+OR refund_id IS NOT NULL)`. A refund without the provider's id is a claim with no proof,
+and a claim with no proof is what a chargeback dispute overturns. A second constraint
+keeps `gateway_transaction_id` on a refunded row: it is what ties the refund to the
+charge it undid.
+
 **No card data in the database.** `payment_attempts.request_payload` stores a masked
 request: brand and last four digits, never the PAN, CVV or expiry date.
 
@@ -126,8 +151,15 @@ validator rejects a ticket without a properly formatted `ticketCode`, or with a 
 outside the enum. Without it, a serialisation bug enters the database silently.
 
 **TTL on `processed_events`.** After 30 days a redelivery is implausible; without the
-TTL the collection would grow forever. The equivalent PostgreSQL tables need a scheduled
-cleanup for the same reason — recorded as a known limit in the README.
+TTL the collection would grow forever.
+
+The PostgreSQL side now has the equivalent: a `RetentionSweeper` in each service deletes
+in bounded batches, hourly. Two rules it cannot break — only `PUBLISHED` leaves the
+outbox (`PENDING` still has to go out, `FAILED` is what someone needs to read), and
+**every inbox window must outlive the redelivery window of whoever feeds it.** Kafka
+keeps 7 days and Stripe retries for days, so the inboxes keep 30. Shortening one reopens
+the double-processing the table exists to prevent. Nothing in `payments` or
+`payment_attempts` is ever deleted: that is the record of the money.
 
 ---
 

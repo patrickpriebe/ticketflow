@@ -14,6 +14,13 @@ pedir a um provedor real que dê timeout sob demanda.
 | `POST /v1/charges` | qualquer outro | **201** `approved`, com `transactionId` gerado |
 | `POST /v1/pix/charges` | — | **201** `approved` |
 | `POST /v1/boletos` | — | **201** `approved` |
+| `POST /refunds` | — | **200** `refunded`, com `refundId` gerado |
+
+O estorno tem regra própria porque ele existe: sem esta stub o gateway respondia 404, o
+Payment Service lia 4xx como **recusa definitiva** do provedor e a cobrança de um pedido
+cancelado ficava `APPROVED` para sempre, sem estornar e sem erro em lugar nenhum. A
+distinção que o código faz — 4xx é recusa, 5xx e timeout são indisponibilidade — só vale
+se o endpoint existir.
 
 O corte em 2000 foi escolhido para casar com o catálogo de demonstração: um ingresso
 **Camarote** custa 2400 e é recusado, enquanto **Pista** custa 650 e é aprovado.
