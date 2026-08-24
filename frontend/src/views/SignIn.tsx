@@ -49,7 +49,7 @@ function Brand({ reason }: { reason?: string }) {
           azul da marca. Repetir o seed do hero é explícito: entrar veste a arte
           da home, e nenhuma mudança futura na lista de paletas transforma esta
           tela em outra coisa sem querer. */}
-      <div className="hero-art">
+      <div className="marquee-art">
         <Poster seed="ticketflow-hero" />
       </div>
 

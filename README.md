@@ -473,6 +473,14 @@ Seven routes with real URLs: home, discover, event, checkout, order, my orders, 
   `styles/tokens.css`; no component writes a hex value.
 - **Three-state theming** — light, dark, and *system*. Without the third, whoever chose
   once is stuck with that choice, and almost nobody returns to fix it.
+- **Four complete designs, switchable live.** `boxoffice` — bone paper, brass, signage
+  lettering, and an event card shaped like a ticket with a tear-off stub — is the default;
+  `stage` and `poster` are the two directions from the redesign canvas (Geist with big
+  imagery, and Instrument Serif with hairlines instead of boxes); `classic` is the original
+  blue-and-Inter design, kept whole rather than deleted. It is a separate axis from
+  light/dark, because the two questions are independent. All four share the token *names*,
+  so a file of values is most of a skin; only the event card and the top of the home page
+  change markup.
 - **Real venue photographs, with a drawn poster as the fallback.** Freely licensed images
   of the real places the catalogue names, served by the site itself. Only empty venues
   qualify: the licence settles the photographer's rights, not the rights of people in the

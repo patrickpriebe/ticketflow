@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { artwork, sequence } from '../lib/artwork';
 import { photoFor } from '../lib/eventPhotos';
+import { useSkin } from '../lib/skin';
 
 interface Props {
   /** Semente do desenho. O mesmo id devolve sempre o mesmo pôster. */
@@ -61,7 +62,8 @@ export function Poster({ seed, className, alt, priority = false }: Props) {
  * mudaria a cada re-render e a grade piscaria a cada digitação na busca.
  */
 function GenerativePoster({ seed, className }: { seed: string; className?: string }) {
-  const art = artwork(seed);
+  // A paleta do cartaz acompanha a pele: o desenho clássico tem as suas cores.
+  const art = artwork(seed, useSkin());
   // Um id por instância: dois gradientes com o mesmo id no documento e o
   // segundo elemento passa a usar as cores do primeiro.
   const gradientId = useId();

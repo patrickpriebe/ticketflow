@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listEvents, type EventSummary } from '../api';
+import { CardSkeleton } from '../components/CardSkeleton';
 import { EventCard } from '../components/EventCard';
 import { Icon } from '../components/Icon';
 import { navigate } from '../lib/router';
@@ -132,6 +133,7 @@ export function Discover({ allEvents, query }: Props) {
       <div>
         <div className="section-head">
           <div>
+            <span className="label">Catálogo</span>
             <h1>Descobrir</h1>
             <p>
               {loading
@@ -159,13 +161,7 @@ export function Discover({ allEvents, query }: Props) {
         {loading ? (
           <div className="card-grid">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="event-card">
-                <div className="event-art skeleton" />
-                <div className="event-card-body stack">
-                  <div className="skeleton skeleton-line" />
-                  <div className="skeleton skeleton-line short" />
-                </div>
-              </div>
+              <CardSkeleton key={i} />
             ))}
           </div>
         ) : filtered.length === 0 ? (

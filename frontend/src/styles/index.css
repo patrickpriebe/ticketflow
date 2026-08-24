@@ -1,4 +1,16 @@
+@import './fonts.css';
 @import './tokens.css';
 @import './base.css';
 @import './components.css';
 @import './views.css';
+
+/* As peles entram por último e vencem por especificidade de atributo, sem
+   precisar de !important em regra nenhuma.
+
+   `flat.css` primeiro: ele devolve a forma retangular para toda pele que não é
+   a de bilheteria. Depois cada pele, que sobrescreve o que não é dela — mesma
+   especificidade, decide a ordem. */
+@import './skins/flat.css';
+@import './skins/classic.css';
+@import './skins/stage.css';
+@import './skins/poster.css';

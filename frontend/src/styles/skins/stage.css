@@ -1,0 +1,244 @@
+/* ==========================================================================
+   Pele: Palco (1a)
+   --------------------------------------------------------------------------
+   Primeira das duas direções do redesenho. Marketplace de larga escala: Geist
+   no texto e Geist Mono em todo número, imagem grande, superfície branca e
+   traço fino. O azul de marca continua sendo o azul de marca.
+
+   A regra que dá o caráter: **âmbar só para urgência**. Ele marca "últimos
+   dias" e o prazo correndo, e não aparece em mais lugar nenhum — é o que faz
+   a cor ainda querer dizer alguma coisa quando aparece. Recusa e esgotado
+   ficam no vermelho, que é outro assunto.
+
+   A estrutura vem de `flat.css`, compartilhada com Clássico e Cartaz.
+   ========================================================================== */
+
+:root[data-skin='stage'] {
+  --brand-50: #f0f4ff;
+  --brand-100: #d9e4ff;
+  --brand-200: #b3c8ff;
+  --brand-500: #0052ff;
+  --brand-600: #0043d1;
+  --brand-700: #0036a8;
+  --brand-ink: #0052ff;
+
+  /* Vermelho de recusa. O desenho não traz um: ele só precisou de âmbar. Mas
+     "esgotado" e "cartão recusado" não podem usar a mesma cor da contagem
+     regressiva, senão urgência e fracasso passam a parecer a mesma coisa. */
+  --accent-500: #b42318;
+  --accent-600: #912018;
+
+  --success-500: #067647;
+  /* O âmbar da tela é #f59e0b; como *texto* sobre branco ele dá 2.2:1, então
+     escurece. A cor de fundo do selo continua sendo a clara. */
+  --warning-500: #b45309;
+
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f8;
+  --bg-inset: #eef0f2;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inverted: #101114;
+  --text-inverted: #fbfbfc;
+
+  --text: #101114;
+  --text-secondary: #45484d;
+  --text-muted: #8a9099;
+  --text-on-brand: #ffffff;
+  --text-on-accent: #ffffff;
+
+  --border: #e6e8eb;
+  --border-strong: #d7dade;
+  --focus-ring: color-mix(in srgb, var(--brand-500) 40%, transparent);
+
+  --shadow-sm: 0 1px 2px rgb(16 17 20 / 5%);
+  --shadow-md: 0 2px 6px rgb(16 17 20 / 6%), 0 8px 24px -12px rgb(16 17 20 / 14%);
+  --shadow-lg: 0 20px 48px -20px rgb(16 17 20 / 22%);
+
+  --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --text-display: clamp(2.25rem, 1.5rem + 3vw, 3.5rem);
+  --text-h1: clamp(1.75rem, 1.35rem + 1.6vw, 2.375rem);
+  --text-h2: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem);
+  --text-h3: 1rem;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --shell-width: 1240px;
+  --header-height: 64px;
+  --duration: 150ms;
+
+  --marquee: var(--surface-inverted);
+  --marquee-text: #ffffff;
+  --marquee-dim: rgb(255 255 255 / 76%);
+  --marquee-rule: rgb(255 255 255 / 16%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-skin='stage']:not([data-theme='light']) {
+    --brand-50: #0f1a33;
+    --brand-100: #16244a;
+    --brand-200: #1d3269;
+    --brand-500: #4d84ff;
+    --brand-600: #3a72f2;
+    --brand-700: #2c5fd6;
+    --brand-ink: #6f9cff;
+
+    --accent-500: #f97066;
+    --accent-600: #e06055;
+
+    --success-500: #47cd89;
+    --warning-500: #f5a524;
+
+    --bg: #0d0d0f;
+    --bg-subtle: #131316;
+    --bg-inset: #1b1b1f;
+    --surface: #141417;
+    --surface-raised: #1b1b1f;
+    --surface-inverted: #fbfbfc;
+    --text-inverted: #101114;
+
+    --text: #f2f3f5;
+    --text-secondary: #c3c7ce;
+    --text-muted: #8a9099;
+    --text-on-brand: #ffffff;
+    --text-on-accent: #101114;
+
+    --border: #26262b;
+    --border-strong: #35353c;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+    --shadow-md: 0 2px 6px rgb(0 0 0 / 45%), 0 8px 24px -12px rgb(0 0 0 / 70%);
+    --shadow-lg: 0 20px 48px -20px rgb(0 0 0 / 80%);
+  }
+}
+
+:root[data-skin='stage'][data-theme='dark'] {
+  --brand-50: #0f1a33;
+  --brand-100: #16244a;
+  --brand-200: #1d3269;
+  --brand-500: #4d84ff;
+  --brand-600: #3a72f2;
+  --brand-700: #2c5fd6;
+  --brand-ink: #6f9cff;
+
+  --accent-500: #f97066;
+  --accent-600: #e06055;
+
+  --success-500: #47cd89;
+  --warning-500: #f5a524;
+
+  --bg: #0d0d0f;
+  --bg-subtle: #131316;
+  --bg-inset: #1b1b1f;
+  --surface: #141417;
+  --surface-raised: #1b1b1f;
+  --surface-inverted: #fbfbfc;
+  --text-inverted: #101114;
+
+  --text: #f2f3f5;
+  --text-secondary: #c3c7ce;
+  --text-muted: #8a9099;
+  --text-on-brand: #ffffff;
+  --text-on-accent: #101114;
+
+  --border: #26262b;
+  --border-strong: #35353c;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 45%), 0 8px 24px -12px rgb(0 0 0 / 70%);
+  --shadow-lg: 0 20px 48px -20px rgb(0 0 0 / 80%);
+}
+
+/* --- O que é do Palco e não vem de token -----------------------------------
+   `flat.css` devolve a forma do desenho original, que era de cantos
+   arredondados e pílulas. Palco é de traço reto: raio pequeno em tudo, e a
+   pílula fica só onde ela quer dizer "isto é um estado", não "isto é um
+   botão". */
+
+:root[data-skin='stage'] .search,
+:root[data-skin='stage'] .chip,
+:root[data-skin='stage'] .filter-tag,
+:root[data-skin='stage'] .user-chip,
+:root[data-skin='stage'] .theme-toggle,
+:root[data-skin='stage'] .skin-select,
+:root[data-skin='stage'] .qty {
+  border-radius: var(--radius-md);
+}
+
+:root[data-skin='stage'] .pill {
+  border-radius: var(--radius-sm);
+}
+
+/* O cabeçalho não é vidro fosco: é branco com um filete embaixo. */
+:root[data-skin='stage'] .site-header {
+  background: var(--bg);
+  backdrop-filter: none;
+}
+
+:root[data-skin='stage'] .brand-mark,
+:root[data-skin='stage'] .avatar {
+  border-radius: 5px;
+}
+
+:root[data-skin='stage'] .avatar {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* Toda data, hora, preço, prazo e código em Geist Mono. É a metade do desenho
+   que se enxerga de longe: um catálogo inteiro de números alinhados. */
+:root[data-skin='stage'] .event-meta,
+:root[data-skin='stage'] .stub-code,
+:root[data-skin='stage'] .tier-price,
+:root[data-skin='stage'] .price-from strong,
+:root[data-skin='stage'] .date-badge strong,
+:root[data-skin='stage'] .date-badge span,
+:root[data-skin='stage'] .qty strong,
+:root[data-skin='stage'] .hero-stats strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-skin='stage'] .event-meta {
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* O selo de data perde o vermelho: no Palco a data é dado, não alarme. */
+:root[data-skin='stage'] .date-badge {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+:root[data-skin='stage'] .date-badge span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Âmbar só aqui: "últimos dias" e a contagem apertando. Em mais nenhum lugar. */
+:root[data-skin='stage'] .art-badge.urgent {
+  background: rgb(245 158 11 / 92%);
+  color: #1c1204;
+}
+
+:root[data-skin='stage'] .countdown.urgent {
+  color: var(--warning-500);
+}
+
+/* A imagem é o argumento desta direção, então ela ganha altura. */
+:root[data-skin='stage'] .event-art {
+  aspect-ratio: 3 / 2;
+}
+
+:root[data-skin='stage'] .trending .featured .event-art {
+  aspect-ratio: 2 / 1;
+}

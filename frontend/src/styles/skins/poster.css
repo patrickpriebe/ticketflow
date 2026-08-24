@@ -1,0 +1,290 @@
+/* ==========================================================================
+   Pele: Cartaz (1b)
+   --------------------------------------------------------------------------
+   Segunda direção do redesenho. Instrument Serif nos títulos e Instrument Sans
+   no texto, papel quase branco de tom quente, e **filete no lugar da caixa**:
+   o catálogo é lido como um índice impresso, não como uma grade de cartões.
+
+   É a decisão que carrega a direção inteira. Tirar a borda de um cartão parece
+   pouco, mas é o que troca "seis caixas iguais" por "uma lista de nomes" — e
+   uma lista de nomes é como um cartaz de temporada de fato apresenta o que
+   está em cartaz.
+
+   A estrutura vem de `flat.css`, compartilhada com Clássico e Palco.
+   ========================================================================== */
+
+:root[data-skin='poster'] {
+  /* O azul de marca fica: o redesenho não mexeu nele. */
+  --brand-50: #f2f5ff;
+  --brand-100: #dde5ff;
+  --brand-200: #b8c9ff;
+  --brand-500: #0052ff;
+  --brand-600: #0043d1;
+  --brand-700: #0036a8;
+  --brand-ink: #0043d1;
+
+  /* Terracota queimada: urgência, esgotado e recusa. É a única cor quente do
+     desenho e ela aparece pouco. */
+  --accent-500: #a2560c;
+  --accent-600: #8a4708;
+
+  --success-500: #2f6b45;
+  --warning-500: #a2560c;
+
+  --bg: #fdfcfa;
+  --bg-subtle: #f6f4f0;
+  --bg-inset: #eeebe5;
+  --surface: #fdfcfa;
+  --surface-raised: #ffffff;
+  --surface-inverted: #2c2a26;
+  --text-inverted: #fdfcfa;
+
+  --text: #1a1917;
+  --text-secondary: #43403a;
+  --text-muted: #8c877d;
+  --text-on-brand: #ffffff;
+  --text-on-accent: #ffffff;
+
+  --border: #e5e2dc;
+  --border-strong: #d8d4cc;
+  --focus-ring: color-mix(in srgb, var(--brand-500) 40%, transparent);
+
+  /* Quase nada: o que separa as coisas aqui é o filete, não a profundidade. */
+  --shadow-sm: none;
+  --shadow-md: 0 1px 0 rgb(26 25 23 / 6%);
+  --shadow-lg: 0 24px 56px -28px rgb(26 25 23 / 24%);
+
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* A serifa tem peso único (400) e desenho estreito: no mesmo corpo ela lê
+     menor que a grotesca, então a escala sobe. */
+  --text-display: clamp(2.75rem, 1.8rem + 4vw, 4.5rem);
+  --text-h1: clamp(2rem, 1.5rem + 2vw, 3rem);
+  --text-h2: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  --text-h3: 1.1875rem;
+
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+
+  --shell-width: 1200px;
+  --header-height: 66px;
+  --duration: 160ms;
+
+  --marquee: var(--surface-inverted);
+  --marquee-text: #fdfcfa;
+  --marquee-dim: rgb(253 252 250 / 74%);
+  --marquee-rule: rgb(253 252 250 / 18%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-skin='poster']:not([data-theme='light']) {
+    --brand-50: #131c33;
+    --brand-100: #1a2647;
+    --brand-200: #24356b;
+    --brand-500: #6f9cff;
+    --brand-600: #5c8bf5;
+    --brand-700: #4a76dd;
+    --brand-ink: #8fb2ff;
+
+    --accent-500: #e08c4a;
+    --accent-600: #c9773a;
+
+    --success-500: #6bb98a;
+    --warning-500: #e08c4a;
+
+    --bg: #141310;
+    --bg-subtle: #1a1815;
+    --bg-inset: #221f1b;
+    --surface: #181614;
+    --surface-raised: #221f1b;
+    --surface-inverted: #f0ede7;
+    --text-inverted: #1a1917;
+
+    --text: #f0ede7;
+    --text-secondary: #c4bfb5;
+    --text-muted: #918b80;
+    --text-on-brand: #141310;
+    --text-on-accent: #141310;
+
+    --border: #2b2823;
+    --border-strong: #3d3931;
+
+    --shadow-sm: none;
+    --shadow-md: 0 1px 0 rgb(0 0 0 / 50%);
+    --shadow-lg: 0 24px 56px -28px rgb(0 0 0 / 80%);
+  }
+}
+
+:root[data-skin='poster'][data-theme='dark'] {
+  --brand-50: #131c33;
+  --brand-100: #1a2647;
+  --brand-200: #24356b;
+  --brand-500: #6f9cff;
+  --brand-600: #5c8bf5;
+  --brand-700: #4a76dd;
+  --brand-ink: #8fb2ff;
+
+  --accent-500: #e08c4a;
+  --accent-600: #c9773a;
+
+  --success-500: #6bb98a;
+  --warning-500: #e08c4a;
+
+  --bg: #141310;
+  --bg-subtle: #1a1815;
+  --bg-inset: #221f1b;
+  --surface: #181614;
+  --surface-raised: #221f1b;
+  --surface-inverted: #f0ede7;
+  --text-inverted: #1a1917;
+
+  --text: #f0ede7;
+  --text-secondary: #c4bfb5;
+  --text-muted: #918b80;
+  --text-on-brand: #141310;
+  --text-on-accent: #141310;
+
+  --border: #2b2823;
+  --border-strong: #3d3931;
+
+  --shadow-sm: none;
+  --shadow-md: 0 1px 0 rgb(0 0 0 / 50%);
+  --shadow-lg: 0 24px 56px -28px rgb(0 0 0 / 80%);
+}
+
+/* --- Serifa nos títulos -----------------------------------------------------
+   `flat.css` manda os títulos para a grotesca, que é o certo para Clássico e
+   Palco. Aqui eles voltam para a display — e em peso 400, porque Instrument
+   Serif não tem outro: pedir 700 faz o navegador engordar a letra sozinho e o
+   resultado é uma serifa borrada. */
+
+:root[data-skin='poster'] h1,
+:root[data-skin='poster'] h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+
+:root[data-skin='poster'] h3,
+:root[data-skin='poster'] h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:root[data-skin='poster'] .hero h1,
+:root[data-skin='poster'] .auth-brand h1,
+:root[data-skin='poster'] .event-hero h1 {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* --- Filete no lugar da caixa ------------------------------------------------
+   O cartão perde a borda, o raio e a sombra. O que separa um evento do
+   seguinte é o espaço e uma linha fina embaixo do texto — como um índice. */
+
+:root[data-skin='poster'] .event-card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+:root[data-skin='poster'] .event-card:hover {
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+:root[data-skin='poster'] .event-card:hover h3 {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:root[data-skin='poster'] .event-art {
+  border-radius: var(--radius-lg);
+}
+
+:root[data-skin='poster'] .event-card-body {
+  padding: var(--space-3) 0 0;
+}
+
+:root[data-skin='poster'] .event-card h3 {
+  font-size: 1.1875rem;
+}
+
+/* O selo de data sai de cima da arte: num índice a data mora na linha, não
+   flutuando sobre a imagem. */
+:root[data-skin='poster'] .date-badge {
+  display: none;
+}
+
+:root[data-skin='poster'] .art-badge {
+  border-radius: var(--radius-sm);
+}
+
+/* Painéis também perdem a caixa: sobra o filete de cima. */
+:root[data-skin='poster'] .buy-panel,
+:root[data-skin='poster'] .order-summary,
+:root[data-skin='poster'] .auth-card,
+:root[data-skin='poster'] .venue-card,
+:root[data-skin='poster'] .pitch {
+  box-shadow: none;
+}
+
+:root[data-skin='poster'] .pitch {
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--text);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding-inline: 0;
+}
+
+:root[data-skin='poster'] .section-head {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+/* Número continua em mono: preço e hora são dado, e dado alinha em coluna. */
+:root[data-skin='poster'] .price-from strong,
+:root[data-skin='poster'] .tier-price,
+:root[data-skin='poster'] .stub-code,
+:root[data-skin='poster'] .hero-stats strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+:root[data-skin='poster'] .search,
+:root[data-skin='poster'] .chip,
+:root[data-skin='poster'] .filter-tag,
+:root[data-skin='poster'] .user-chip,
+:root[data-skin='poster'] .theme-toggle,
+:root[data-skin='poster'] .skin-select,
+:root[data-skin='poster'] .qty,
+:root[data-skin='poster'] .pill {
+  border-radius: var(--radius-sm);
+}
+
+:root[data-skin='poster'] .site-header {
+  background: var(--bg);
+  backdrop-filter: none;
+}
+
+:root[data-skin='poster'] .brand {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.375rem;
+  letter-spacing: 0;
+}
+
+:root[data-skin='poster'] .brand-mark,
+:root[data-skin='poster'] .avatar {
+  border-radius: var(--radius-sm);
+}

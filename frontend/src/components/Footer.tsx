@@ -1,5 +1,7 @@
 import { linkProps } from '../lib/router';
 import { Icon } from './Icon';
+import { SkinToggle } from './SkinToggle';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Footer() {
   return (
@@ -60,6 +62,16 @@ export function Footer() {
         <div className="footer-bottom">
           <span>TicketFlow · ambiente de demonstração</span>
           <span>Nenhum pagamento real é processado.</span>
+
+          {/* O alternador de tema sai do cabeçalho no celular — três botões, o
+              nome da marca, o menu e o botão de entrar não cabem em 375px sem
+              estourar a linha. Aqui ele continua alcançável, e some no desktop,
+              onde o do cabeçalho já resolve. */}
+          <div className="footer-theme">
+            <ThemeToggle />
+          </div>
+
+          <SkinToggle />
         </div>
       </div>
     </footer>

@@ -32,7 +32,7 @@ export function EventPage({ event, cart, onCart }: Props) {
   return (
     <>
       <div className="event-hero">
-        <div className="hero-art">
+        <div className="marquee-art">
           <Poster seed={event.id} alt={`${event.venue}, ${event.city}`} priority />
         </div>
 

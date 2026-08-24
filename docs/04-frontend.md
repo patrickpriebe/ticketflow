@@ -16,6 +16,7 @@ Payment Service does is driven by events.
 | Build | Vite | Fast dev server and a built-in proxy |
 | UI | React 18 + strict TypeScript | Types mirror the OpenAPI contract |
 | Styling | CSS custom properties | Light/dark comes for free; zero runtime |
+| Type | Self-hosted woff2, one set per skin | No CDN and no third party in the render path |
 | Routing | Own router (~60 lines) | See [Decisions](#decisions) |
 | State | `useState` + `sessionStorage` | There is not enough global state to justify a library |
 
@@ -54,28 +55,136 @@ The frontend reads the token's claims to write the name on screen, **and only fo
 Anyone can build a JWT with any name in it; the part that cannot be forged is the
 signature, and checking signatures is the job of whoever holds the data.
 
+## Four skins, chosen by the visitor
+
+The site ships **four complete designs**, and a control switches between them live, with
+no reload:
+
+| Skin | What it is |
+|---|---|
+| `boxoffice` | Default. Bone paper, brass, signage lettering, event card shaped like a ticket with a tear-off stub |
+| `stage` | 1a "Palco". Geist, big imagery, every number in Geist Mono, amber reserved for urgency alone |
+| `poster` | 1b "Cartaz". Instrument Serif headings, warm near-white paper, hairline instead of box — the catalogue reads as an index |
+| `classic` | The original design: brand blue, Inter, rounded cards |
+
+`stage` and `poster` come from the two directions in the *TicketFlow Redesign* canvas.
+They are redesigns of the original layout — same routes, components remade — so they
+inherit its markup and change only their clothes.
+
+The control sits in the header above 1140px and in the footer always. The footer alone was
+where it started, and that was wrong: a preference nobody can find without scrolling to the
+bottom of the page is a preference nobody has. It is a `<select>` rather than a row of
+buttons — with two skins the buttons fitted, with four they want some 380px, which the
+header line does not have.
+
+Because it renders twice, the component holds **no state of its own**. With a `useState` per
+instance, clicking the one in the header changed the whole site while the one in the footer
+went on showing the previous choice — two controls disagreeing. Both read `useSkin()`, which
+is the same attribute the CSS reads, so the copies cannot drift from each other or from the
+screen.
+
+### How the four share one stylesheet
+
+All skins share the **token names**, so a file of values is most of a skin. Beyond that:
+
+- `skins/flat.css` holds the rectangular layout — hero, pitch strip, card with a calendar
+  badge — shared by `classic`, `stage` and `poster`. It is scoped
+  `:not([data-skin='boxoffice'])` rather than a list of skins, so a new flat skin works
+  without touching it; forgetting to add it to a list would be a screen with no styling at all.
+- `skins/classic.css`, `skins/stage.css`, `skins/poster.css` hold each skin's tokens and
+  the handful of decisions no token carries.
+
+**Specificity is the trap here.** `flat.css` selectors carry two attributes, so
+`[data-skin]:not([data-skin='boxoffice']) h1` scores (0,3,0). A per-skin override written
+as `[data-skin='poster'] h1` scores (0,2,0) and loses **silently** — that is exactly how
+the Cartaz headings stayed in the grotesque and its date badge kept showing on a grid that
+is not supposed to have one. Per-skin overrides are written `:root[data-skin='…']` to tie,
+and import order decides.
+
+The same trap bit the responsive layout from the other side: `flat.css` set
+`.discover` and `.trending` to multi-column at (0,3,0), which outranks the
+`@media (max-width: 1000px)` collapse in `views.css` at (0,1,0). On a phone the filter rail
+stayed 240px wide and the whole page scrolled sideways. Those grids now sit inside a
+`min-width` guard.
+
+Exactly **two** places change markup rather than styling, and both branch in React on
+`usesFlatLayout()`: the event card and the top of the home page. The generative poster
+palette follows the skin too — a box office poster inside the blue rounded card, or a blue
+one on warm paper, does not look like the same site.
+
 ## Design system
 
 Everything comes from `src/styles/tokens.css`. **No component writes a hex value** — if
 one does, the dark theme never reaches that part of the screen, and that is always how a
 dark mode ends up half-finished.
 
-- **Primary `#0052ff`** — actions, links and active states
-- **Ink `#121212`** — text and inverted surfaces
-- **Accent `#bf3003`** — urgency, sold out, decline. Used sparingly: if it shows up
-  everywhere it stops meaning anything
-- **Neutral `#f8f9fa`** — section background
-- **Inter**, with the system stack as a fallback
+The direction is a **box office**: bone paper, near-black ink, brass fittings, and the
+red of the curtain kept for the things that go wrong. There is no product blue anywhere,
+because the subject is a theatre and a stadium, not a dashboard.
+
+- **Brass** — the hardware. Two values, not one: `--brand-500` fills buttons and markers,
+  and `--brand-ink` is the darker tone for whenever brass has to be *text* on paper. One
+  value cannot serve both sides: the shade light enough for ink to sit on top of fails as
+  text on the page, and the compromise fails at both ends
+- **Curtain `--accent-500`** — urgency, sold out, decline, cancellation. Used sparingly:
+  if it shows up everywhere it stops meaning anything
+- **Paper** — the ground is bone with a green cast, and a card is *lighter* than it. Cards
+  rise by luminance, not by shadow. Shadow is left for the few things that genuinely
+  float: a sticky panel, the header, the order stub
+- **Ink rules** — the header, the section heads and the totals close with a 1px line at
+  full text strength. That line, not a border radius, is what separates things here
+
+Three typefaces, one job each:
+
+- **Big Shoulders Display** for headings and event names. It was drawn for street
+  signage — narrow, tall, meant to be read from across a road. It is the marquee lettering
+- **IBM Plex Sans** for running text
+- **IBM Plex Mono** for every number — price, time, countdown, ticket code, order id,
+  quantity — and for the small uppercase labels. Close to half of a box office screen is
+  numbers, and a column of tabular figures is easier to compare than proportional ones
+
+The files are served by the site itself, not by a font CDN. It is the same decision
+already taken for the venue photographs: `font-src 'self'`, and a page that changes
+typeface because a third party went down is a failure that need not exist. Only the two
+`latin` subsets are preloaded; `latin-ext` is declared and fetched only if some character
+needs it.
 
 The theme has **three states**: light, dark, and "follow the system". Without the third,
 whoever chose once is stuck — and most people never go back to the button to fix it. The
 default is the third, and in that case the `data-theme` attribute is not in the DOM at
 all: `prefers-color-scheme` decides.
 
-In dark mode the palette is not the light one inverted. Pure brand blue on a near-black
-background falls below the minimum contrast, so it lightens to `#4d84ff`. And the
-background is not pure black, because no shadow is visible over `#000` and the depth
-hierarchy disappears with it.
+In dark mode the palette is not the light one inverted. Brass has to lighten so that ink
+still reads on top of it, and the background is not pure black, because no shadow is
+visible over `#000` and the depth hierarchy disappears with it.
+
+Four tokens deliberately do **not** follow the theme: `--marquee`, `--marquee-text`,
+`--marquee-dim` and `--marquee-rule`. The panel at the top of the home page, the event
+header and the sign-in artwork are dark in both themes, because a marquee is dark and a
+photograph goes on top of it. A marquee that lightens with the theme is white text on a
+white ground for half the visits. Same case as the white backing of the QR code: fixed
+context, fixed colour.
+
+## The signature: a card is a ticket
+
+An event card is not a rounded rectangle with a photo in it. It is a ticket — body on the
+left, tear-off stub on the right, a dashed perforation between them and a punched notch at
+each end. The stub carries the date and nothing else: day, month, and the weekday printed
+along the counterfoil, the way a real one prints it. It is `aria-hidden`, because the full
+date is already written out in the body and a screen reader should not hear it twice.
+
+The shape already existed in this project. It was locked inside the order screen, where
+only somebody who had already bought could ever see it. Promoting it to the unit the whole
+catalogue is built from costs nothing, and it is the one thing on the page that could not
+belong to any other product.
+
+The notch is a full circle with a border, offset half its own width outside the card;
+`overflow: hidden` eats the outer half and what remains is an arc — which is what makes a
+hole look like a hole. Without the border the bite is invisible: the page, the card and
+the stub are three neighbouring tones of bone on purpose, and three neighbouring tones
+draw no edge at all. Because the notch has to be the colour of whatever sits *behind* the
+card, it reads a `--ground` custom property that any section with a different background
+can override.
 
 ## Decisions
 

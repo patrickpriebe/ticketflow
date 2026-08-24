@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Session } from '../api';
 import { linkProps, navigate, type Route } from '../lib/router';
 import { Icon } from './Icon';
+import { SkinToggle } from './SkinToggle';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
@@ -56,6 +57,12 @@ export function Header({ session, route, onSignOut }: Props) {
         </form>
 
         <div className="header-actions">
+          {/* O seletor de desenho vive nos dois lugares. No rodapé porque é
+              onde uma preferência costuma morar; aqui porque no rodapé ninguém
+              o encontra, e uma escolha que exige rolar a página inteira até o
+              fim é uma escolha que não existe. Some abaixo de 1140px, onde a
+              linha do cabeçalho não comporta os dois controles. */}
+          <SkinToggle />
           <ThemeToggle />
 
           {session ? (
