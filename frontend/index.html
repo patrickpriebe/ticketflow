@@ -9,15 +9,29 @@
     <title>TicketFlow · Ingressos para shows, jogos e espetáculos</title>
 
     <!--
-      Inter, com fallback para a fonte do sistema. Se a rede não responder, a
-      página continua legível na fonte da própria máquina — por isso `swap` e
-      por isso a pilha de fallback no token --font-sans.
+      As fontes moram aqui, não num CDN. É a mesma decisão já tomada para as
+      fotos dos locais: `img-src 'self'`, e um cartão que perde a imagem porque
+      um terceiro caiu é uma falha que não precisa existir. Vale mais ainda
+      para a tipografia — sem ela a página inteira troca de letra.
+
+      Só os dois arquivos do subset `latin` entram em `preload`: são os que toda
+      visita pede. O `latin-ext` fica declarado no CSS e o navegador só o baixa
+      se algum caractere do texto exigir. Se nada carregar, a pilha de fallback
+      em --font-display / --font-sans mantém a página legível.
     -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/big-shoulders-display-500-800-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/ibm-plex-sans-400-700-latin.woff2"
+      crossorigin
     />
 
     <!--

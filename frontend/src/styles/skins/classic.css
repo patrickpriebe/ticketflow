@@ -1,0 +1,176 @@
+/* ==========================================================================
+   Pele: Clássico
+   --------------------------------------------------------------------------
+   O desenho anterior do site, preservado inteiro e selecionável pelo controle
+   que aparece no cabeçalho e no rodapé: azul de marca, Inter, cantos
+   arredondados e cartão de evento retangular com selo de calendário sobre a
+   arte.
+
+   Este arquivo entra depois de todos os outros. Ele faz duas coisas:
+
+   1. Devolve os valores antigos aos tokens. Como as duas peles compartilham os
+      *nomes* dos tokens, isso sozinho já reverte cor, raio, sombra e fonte em
+      toda a interface, sem uma linha por componente.
+   2. Repõe as regras que eram exclusivas do desenho antigo — o herói, a faixa
+      de argumentos, o cartão retangular — e desfaz as decisões tipográficas do
+      desenho de bilheteria, que não vivem em token nenhum: letra de marquise
+      nos títulos, mono e caixa alta nos rótulos, régua de tinta no lugar da
+      sombra.
+
+   Só duas telas mudam de marcação entre as peles, e as duas resolvem isso no
+   React: o cartão de evento e a abertura da home.
+   ========================================================================== */
+
+/* --- Tokens: claro -------------------------------------------------------- */
+
+:root[data-skin='classic'] {
+  --brand-50: #eef3ff;
+  --brand-100: #d9e4ff;
+  --brand-200: #b3c8ff;
+  --brand-500: #0052ff;
+  --brand-600: #0043d1;
+  --brand-700: #0036a8;
+
+  /* O desenho antigo não separava latão de preenchimento e latão de texto: o
+     azul de marca tem contraste de sobra sobre branco nos dois papéis. */
+  --brand-ink: #0052ff;
+
+  --accent-500: #bf3003;
+  --accent-600: #9c2702;
+
+  --success-500: #0f7b4f;
+  --warning-500: #a35c00;
+
+  --bg: #ffffff;
+  --bg-subtle: #f8f9fa;
+  --bg-inset: #f1f3f5;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inverted: #121212;
+  --text-inverted: #f8f9fa;
+
+  --text: #121212;
+  --text-secondary: #45484d;
+  --text-muted: #6b7078;
+  --text-on-brand: #ffffff;
+  --text-on-accent: #ffffff;
+
+  --border: #e3e6ea;
+  --border-strong: #cfd4da;
+  --focus-ring: color-mix(in srgb, var(--brand-500) 45%, transparent);
+
+  --shadow-sm: 0 1px 2px rgb(18 18 18 / 6%), 0 1px 3px rgb(18 18 18 / 4%);
+  --shadow-md: 0 4px 12px rgb(18 18 18 / 8%), 0 2px 4px rgb(18 18 18 / 4%);
+  --shadow-lg: 0 16px 40px rgb(18 18 18 / 12%), 0 4px 12px rgb(18 18 18 / 6%);
+
+  /* Uma família só. `--font-display` continua existindo porque o CSS
+     compartilhado o usa nos títulos; aqui ele aponta para a mesma Inter. */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+
+  --text-display: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
+  --text-h1: clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem);
+  --text-h2: clamp(1.375rem, 1.15rem + 0.9vw, 1.75rem);
+  --text-h3: 1.125rem;
+
+  --space-8: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shell-width: 1200px;
+  --header-height: 68px;
+
+  --duration: 160ms;
+
+  /* O painel escuro do herói e da tela de entrar. No desenho antigo ele saía de
+     `--surface-inverted` com o texto em branco fixo, e quem garantia a
+     legibilidade era o degradê preto por cima — inclusive no tema escuro, onde
+     a superfície invertida é clara. Mantido como era. */
+  --marquee: var(--surface-inverted);
+  --marquee-text: #ffffff;
+  --marquee-dim: rgb(255 255 255 / 78%);
+  --marquee-rule: rgb(255 255 255 / 18%);
+}
+
+/* --- Tokens: escuro ------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root[data-skin='classic']:not([data-theme='light']) {
+    --brand-50: #101a33;
+    --brand-100: #16244a;
+    --brand-200: #1d3269;
+    --brand-500: #4d84ff;
+    --brand-600: #3a72f2;
+    --brand-700: #2c5fd6;
+    --brand-ink: #4d84ff;
+
+    --accent-500: #ff6a3d;
+    --accent-600: #e85526;
+
+    --success-500: #35b57e;
+    --warning-500: #d99423;
+
+    --bg: #0b0b0d;
+    --bg-subtle: #121215;
+    --bg-inset: #1a1a1f;
+    --surface: #141418;
+    --surface-raised: #1c1c22;
+    --surface-inverted: #f8f9fa;
+    --text-inverted: #121212;
+
+    --text: #f2f3f5;
+    --text-secondary: #c3c7ce;
+    --text-muted: #8d939d;
+    --text-on-brand: #ffffff;
+    --text-on-accent: #ffffff;
+
+    --border: #26262d;
+    --border-strong: #35353f;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
+    --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+  }
+}
+
+:root[data-skin='classic'][data-theme='dark'] {
+  --brand-50: #101a33;
+  --brand-100: #16244a;
+  --brand-200: #1d3269;
+  --brand-500: #4d84ff;
+  --brand-600: #3a72f2;
+  --brand-700: #2c5fd6;
+  --brand-ink: #4d84ff;
+
+  --accent-500: #ff6a3d;
+  --accent-600: #e85526;
+
+  --success-500: #35b57e;
+  --warning-500: #d99423;
+
+  --bg: #0b0b0d;
+  --bg-subtle: #121215;
+  --bg-inset: #1a1a1f;
+  --surface: #141418;
+  --surface-raised: #1c1c22;
+  --surface-inverted: #f8f9fa;
+  --text-inverted: #121212;
+
+  --text: #f2f3f5;
+  --text-secondary: #c3c7ce;
+  --text-muted: #8d939d;
+  --text-on-brand: #ffffff;
+  --text-on-accent: #ffffff;
+
+  --border: #26262d;
+  --border-strong: #35353f;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+}

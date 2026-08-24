@@ -1,0 +1,890 @@
+/* ==========================================================================
+   Estrutura comum às peles de layout retangular
+   --------------------------------------------------------------------------
+   Bilheteria é a única pele com marcação própria: cartão em forma de ingresso
+   e marquise com quadro de sessões. Clássico, Palco e Cartaz compartilham a
+   outra marcação — herói centralizado, faixa de argumentos e cartão retangular
+   com selo de calendário — e é ela que este arquivo veste.
+
+   Nada aqui escreve cor: tudo sai de token, e cada pele define os seus. O que
+   este arquivo faz é devolver a *forma* — e desfazer as decisões que são
+   assinatura da bilheteria e não valem fora dela: letra de marquise nos
+   títulos, mono e caixa alta em todo rótulo, régua de tinta no lugar da
+   sombra.
+
+   O seletor é `:not([data-skin='boxoffice'])` em vez de uma lista de peles:
+   uma pele nova de layout retangular passa a funcionar sem tocar aqui, e
+   esquecer de incluí-la na lista seria uma tela sem estilo nenhum.
+   ========================================================================== */
+
+/* --- Tipografia ------------------------------------------------------------
+   Aqui está a metade que token nenhum resolve: a pele de bilheteria põe letra
+   de sinalização nos títulos, mono e caixa alta em todo rótulo, e fecha as
+   seções com uma régua de tinta. Nada disso existia antes. */
+
+[data-skin]:not([data-skin='boxoffice']) body {
+  line-height: 1.55;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+[data-skin]:not([data-skin='boxoffice']) h1,
+[data-skin]:not([data-skin='boxoffice']) h2,
+[data-skin]:not([data-skin='boxoffice']) h3,
+[data-skin]:not([data-skin='boxoffice']) h4 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: wrap;
+}
+
+[data-skin]:not([data-skin='boxoffice']) h3,
+[data-skin]:not([data-skin='boxoffice']) h4 {
+  font-size: var(--text-h3);
+  letter-spacing: -0.01em;
+}
+
+[data-skin]:not([data-skin='boxoffice']) ::selection {
+  background: var(--brand-500);
+  color: var(--text-on-brand);
+}
+
+[data-skin]:not([data-skin='boxoffice']) :focus-visible {
+  outline-color: var(--brand-500);
+}
+
+/* A etiqueta em mono e caixa alta é invenção do desenho novo. No cabeçalho de
+   seção ela some — o desenho antigo não tinha sobretítulo nenhum ali. Onde
+   sobra, volta a ser texto pequeno e apagado. */
+[data-skin]:not([data-skin='boxoffice']) .label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .section-head .label {
+  display: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .section-head {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* --- Controles -------------------------------------------------------------- */
+
+[data-skin]:not([data-skin='boxoffice']) .btn {
+  letter-spacing: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .btn-secondary {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .btn-secondary:hover:not(:disabled) {
+  background: var(--bg-inset);
+  color: var(--text);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .btn-danger {
+  background: var(--accent-500);
+  border-color: var(--accent-500);
+  color: #fff;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .btn-danger:hover:not(:disabled) {
+  background: var(--accent-500);
+  filter: brightness(0.92);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .btn-sm {
+  padding: 0.375rem 0.75rem;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .back,
+[data-skin]:not([data-skin='boxoffice']) .field > label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .field > label {
+  color: var(--text-secondary);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .search {
+  border-radius: var(--radius-pill);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .input:focus,
+[data-skin]:not([data-skin='boxoffice']) .search:focus-within {
+  border-color: var(--brand-500);
+}
+
+/* --- Selos e chips ---------------------------------------------------------- */
+
+[data-skin]:not([data-skin='boxoffice']) .pill {
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pill-brand {
+  background: var(--brand-50);
+  color: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .chip {
+  padding: 0.375rem 0.75rem;
+  border-color: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .chip:hover {
+  border-color: var(--border-strong);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .chip[aria-pressed='true'] {
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+  color: var(--text-on-brand);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .filter-tag {
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand-50);
+  color: var(--brand-500);
+}
+
+/* --- Cabeçalho e rodapé ------------------------------------------------------ */
+
+[data-skin]:not([data-skin='boxoffice']) .site-header {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .header-inner {
+  gap: var(--space-5);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .brand {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #fff;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .nav-link {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 0;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .nav-link:hover {
+  background: var(--bg-inset);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .nav-link.active {
+  color: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .header-search {
+  max-width: 340px;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .user-chip {
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .theme-toggle {
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  overflow: visible;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .theme-toggle button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .theme-toggle button + button {
+  border-left: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .theme-toggle button:hover {
+  background: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .theme-toggle button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--brand-500);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .site-footer {
+  padding-block: var(--space-7) var(--space-5);
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .footer-grid h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .footer-grid a,
+[data-skin]:not([data-skin='boxoffice']) .footer-grid li {
+  color: var(--text-muted);
+}
+
+/* --- Herói -------------------------------------------------------------------
+   Exclusivo desta pele: o painel escuro com o título centralizado, a busca em
+   vidro e os três números embaixo. */
+
+[data-skin]:not([data-skin='boxoffice']) .hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: min(560px, 70vh);
+  padding-block: var(--space-8);
+  overflow: hidden;
+  background: var(--surface-inverted);
+  text-align: center;
+}
+
+/* A arte do herói é desenhada, não fotografada: o catálogo não tem imagem e
+   inventar um campo no contrato só para o front ficar bonito seria o rabo
+   abanando o cachorro. */
+[data-skin]:not([data-skin='boxoffice']) .hero-art {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #000 35%, transparent) 0%,
+    color-mix(in srgb, #000 70%, transparent) 100%
+  );
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero .shell {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero h1 {
+  font-size: var(--text-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: #fff;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero p {
+  margin-top: var(--space-4);
+  font-size: 1.0625rem;
+  color: rgb(255 255 255 / 78%);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-search {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 620px;
+  margin: var(--space-6) auto 0;
+  padding: var(--space-2);
+  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(10px);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-search .search {
+  flex: 1;
+  background: #fff;
+  border-color: transparent;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-search .search input {
+  color: #121212;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-stats div {
+  color: rgb(255 255 255 / 70%);
+  font-size: var(--text-sm);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .hero-stats strong {
+  display: block;
+  font-size: 1.375rem;
+  color: #fff;
+}
+
+/* Estas três grades precisam de guarda de largura. O seletor de pele tem
+   especificidade de atributo e vence o `@media (max-width: 1000px)` de
+   views.css, que é uma classe só — sem a guarda, a barra de filtros ficava
+   com 240px fixos no telefone e a página rolava de lado.
+   -------------------------------------------------------------------------- */
+
+/* --- Destaques e faixa de argumentos ------------------------------------------ */
+
+@media (min-width: 1001px) {
+  [data-skin]:not([data-skin='boxoffice']) .trending {
+    grid-template-columns: 1.6fr 1fr;
+  }
+}
+
+[data-skin]:not([data-skin='boxoffice']) .trending-side {
+  grid-template-rows: 1fr 1fr;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Faixa de argumentos: por que comprar aqui. Também é onde a arquitetura
+   aparece para quem só olha a tela. */
+[data-skin]:not([data-skin='boxoffice']) .pitch {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  padding: var(--space-6);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pitch-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pitch-item .icon-badge {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--brand-50);
+  color: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pitch-item h3 {
+  font-size: var(--text-body);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pitch-item p {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* --- Cartão de evento retangular ----------------------------------------------
+   A marcação deste cartão vem do React (`EventCard` ramifica pela pele); estas
+   são as regras que o vestem. */
+
+[data-skin]:not([data-skin='boxoffice']) .event-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-card h3 {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-meta {
+  align-items: center;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-meta svg {
+  margin-top: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .price-from {
+  display: inline;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .price-from strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Cores fixas, não tokens: estes dois selos ficam sempre sobre a arte escura do
+   pôster, nos dois temas. É o mesmo caso do QR — contexto fixo, cor fixa. */
+[data-skin]:not([data-skin='boxoffice']) .art-badge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0.625rem;
+  background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .art-badge.urgent {
+  color: #ffb4a0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .pill-on-art {
+  background: rgb(255 255 255 / 15%);
+  border: 0;
+  color: #fff;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .date-badge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 48px;
+  padding: var(--space-2) 0;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  line-height: 1.1;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .date-badge strong {
+  font-size: 1.125rem;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .date-badge span {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--accent-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .trending .featured .event-art {
+  aspect-ratio: 16 / 9;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .trending .featured h3 {
+  font-size: 1.5rem;
+}
+
+@media (min-width: 721px) {
+  [data-skin]:not([data-skin='boxoffice']) .trending-side .event-card {
+    flex-direction: row;
+  }
+}
+
+@media (min-width: 721px) {
+  [data-skin]:not([data-skin='boxoffice']) .trending-side .event-art {
+    flex-shrink: 0;
+    width: 40%;
+    aspect-ratio: auto;
+  }
+}
+
+/* --- Etapas, canhoto e linha do tempo ------------------------------------------ */
+
+[data-skin]:not([data-skin='boxoffice']) .step {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .step-mark {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .step-line {
+  height: 2px;
+  background: var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .step-line.done {
+  background: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .stub {
+  box-shadow: var(--shadow-md);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .stub-total,
+[data-skin]:not([data-skin='boxoffice']) .summary-total {
+  border-top-color: var(--border);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .buy-panel-head {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .perforation .dashes {
+  margin-inline: var(--space-5);
+  border-top-width: 2px;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .notch {
+  border-color: var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .timeline li:not(:last-child)::before {
+  top: 18px;
+  left: 9px;
+  width: 2px;
+  background: var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .timeline .bullet {
+  width: 10px;
+  height: 10px;
+  margin-left: 5px;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .timeline .current .bullet {
+  box-shadow: 0 0 0 4px var(--brand-50);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .ticket-code {
+  font-weight: 700;
+}
+
+/* --- Avisos e abas -------------------------------------------------------------- */
+
+[data-skin]:not([data-skin='boxoffice']) .alert {
+  border: 1px solid color-mix(in srgb, var(--accent-500) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-500) 10%, var(--surface));
+}
+
+[data-skin]:not([data-skin='boxoffice']) .note,
+[data-skin]:not([data-skin='boxoffice']) .refund-note {
+  border-left: 0;
+  border-radius: var(--radius-md);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .tabs {
+  gap: var(--space-1);
+  padding-bottom: var(--space-1);
+  border-bottom-color: var(--border);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .tab {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .tab.active {
+  color: var(--brand-500);
+  border-bottom-color: var(--brand-500);
+}
+
+/* --- Painéis de compra ----------------------------------------------------------- */
+
+[data-skin]:not([data-skin='boxoffice']) .tier.chosen,
+[data-skin]:not([data-skin='boxoffice']) .method.chosen {
+  border-color: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .method .radio {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .method.chosen .radio {
+  border-color: var(--brand-500);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .method-icon {
+  width: 36px;
+  height: 36px;
+  border: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .tier-price {
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .qty {
+  gap: var(--space-1);
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  overflow: visible;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .qty button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .qty strong {
+  min-width: 24px;
+  padding-inline: 0;
+  border-inline: 0;
+  font-family: var(--font-sans);
+  line-height: inherit;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .filter-group h4 {
+  padding-bottom: 0;
+  border-bottom: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .filter-group .range .input {
+  font-family: var(--font-sans);
+}
+
+@media (min-width: 1001px) {
+  [data-skin]:not([data-skin='boxoffice']) .discover {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+[data-skin]:not([data-skin='boxoffice']) .summary-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+}
+
+/* --- Página do evento e entrar ----------------------------------------------------
+   As duas telas mantiveram a marcação, então aqui só voltam as medidas: o
+   painel escuro é mais raso e a arte por trás dele, mais forte. */
+
+[data-skin]:not([data-skin='boxoffice']) .marquee-art {
+  opacity: 0.55;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-hero {
+  min-height: 380px;
+  border-bottom: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-hero .marquee-art {
+  opacity: 0.7;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-hero::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #000 20%, transparent) 0%,
+    color-mix(in srgb, #000 78%, transparent) 100%
+  );
+}
+
+[data-skin]:not([data-skin='boxoffice']) .event-hero h1 {
+  max-width: 22ch;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-brand .marquee-art {
+  opacity: 0.55;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-brand::after {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #000 30%, transparent) 0%,
+    color-mix(in srgb, #000 78%, transparent) 100%
+  );
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-brand h1 {
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-points {
+  gap: var(--space-5);
+  margin-top: var(--space-7);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-points li {
+  padding-top: 0;
+  border-top: 0;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-point-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 14%);
+  border-color: rgb(255 255 255 / 18%);
+}
+
+[data-skin]:not([data-skin='boxoffice']) .auth-card h2 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+/* --- Responsivo -------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  /* O cartão da lateral empilha no telefone, como fazia antes. */
+  [data-skin]:not([data-skin='boxoffice']) .trending-side .event-card {
+    flex-direction: column;
+  }
+
+  [data-skin]:not([data-skin='boxoffice']) .trending-side .event-art {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+  }
+}
+
+@media (max-width: 720px) {
+  /* A folga de 24px entre marca, menu e botão de entrar é de desktop. Mantida
+     no telefone ela estoura a linha em 6px — e uma página inteira que rola de
+     lado por 6px parece defeito, não aperto. */
+  [data-skin]:not([data-skin='boxoffice']) .header-inner {
+    gap: var(--space-3);
+  }
+}
+
+@media (max-width: 640px) {
+  /* O respiro lateral do desenho antigo era maior; o alternador de tema
+     continua no rodapé, que é onde o seletor de desenho também vive. */
+  [data-skin]:not([data-skin='boxoffice']) .shell {
+    padding-inline: var(--space-5);
+  }
+
+  [data-skin]:not([data-skin='boxoffice']) .brand {
+    font-size: 1.0625rem;
+  }
+}
+
+/* --- Seletor de desenho ------------------------------------------------------
+   O controle é o mesmo nos dois; só a roupa muda. */
+
+[data-skin]:not([data-skin='boxoffice']) .skin-toggle-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin]:not([data-skin='boxoffice']) .skin-select {
+  border-color: var(--border-strong);
+}

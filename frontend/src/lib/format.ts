@@ -19,6 +19,11 @@ export function calendarBadge(iso: string) {
   return { day: String(date.getDate()).padStart(2, '0'), month: MONTHS[date.getMonth()] };
 }
 
+/** "sáb" — o dia da semana no trilho vertical do canhoto. O pt-BR devolve com
+ *  ponto abreviativo ("sáb."), que num trilho de 12px vira sujeira. */
+export const weekdayShort = (iso: string) =>
+  new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(new Date(iso)).replace('.', '');
+
 /** Quantos dias faltam. Negativo é passado; usado só para rótulos de urgência. */
 export function daysUntil(iso: string): number {
   const diff = new Date(iso).getTime() - Date.now();

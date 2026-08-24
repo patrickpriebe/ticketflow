@@ -132,7 +132,7 @@ page looks like care and turns into stuck inventory.
 
 **Microfrontends.** There are seven screens.
 
-**A third-party component library.** The design system here is four CSS files and no
+**A third-party component library.** The design system here is six CSS files and no
 runtime. Pulling in a whole library to reuse a button and a modal would cost more than
 the two components.
 

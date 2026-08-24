@@ -1,6 +1,10 @@
 /* ==========================================================================
    Tokens
    --------------------------------------------------------------------------
+   A direção é uma bilheteria: papel osso, tinta quase preta, ferragem de
+   latão e o vermelho da cortina reservado para o que dá errado. Nada de azul
+   de produto — o assunto aqui é teatro, estádio e casa de show, não painel.
+
    Uma cor só é definida aqui. Nenhum componente escreve um hexadecimal: se
    escrever, o tema escuro não alcança aquele pedaço da tela, e é sempre assim
    que um dark mode fica pela metade.
@@ -12,62 +16,91 @@
    ========================================================================== */
 
 :root {
-  /* --- Marca ------------------------------------------------------------ */
-  --brand-50:  #eef3ff;
-  --brand-100: #d9e4ff;
-  --brand-200: #b3c8ff;
-  --brand-500: #0052ff;
-  --brand-600: #0043d1;
-  --brand-700: #0036a8;
+  /* --- Marca: latão ------------------------------------------------------
+     Duas ferragens, não uma. O latão que serve de *fundo* de botão precisa
+     ser claro para a tinta por cima passar no contraste; o latão que serve de
+     *texto* sobre papel precisa ser escuro pelo mesmo motivo. Um valor só não
+     atende os dois lados — e o meio-termo reprova nos dois. */
+  --brand-500: #b98b22; /* preenchimento: botão, marcador, estado ativo */
+  --brand-ink: #7a5709; /* texto de marca sobre papel — 5.7:1 */
+  --brand-600: #a1780f;
+  --brand-700: #7a5709;
+  --brand-50: #f4ecd6;
+  --brand-100: #ead9ab;
+  --brand-200: #d9c078;
 
-  /* Destaque: urgência, esgotando, recusa. Usado com parcimônia — se aparece
-     em tudo, deixa de significar alguma coisa. */
-  --accent-500: #bf3003;
-  --accent-600: #9c2702;
+  /* Cortina: urgência, esgotado, recusa, cancelamento. Usado com parcimônia —
+     se aparece em tudo, deixa de significar alguma coisa. */
+  --accent-500: #8e1b25;
+  --accent-600: #701018;
 
-  --success-500: #0f7b4f;
-  --warning-500: #a35c00;
+  --success-500: #1f5c3d;
+  --warning-500: #8a5a08;
 
-  /* --- Superfícies ------------------------------------------------------ */
-  --bg: #ffffff;
-  --bg-subtle: #f8f9fa;
-  --bg-inset: #f1f3f5;
-  --surface: #ffffff;
+  /* --- Superfícies ------------------------------------------------------
+     O papel é osso com fundo esverdeado, e a superfície é *mais clara* que
+     ele. Cartão sobe por luminosidade, não por sombra: sombra em tudo é o que
+     dá aquela cara de modelo pronto. */
+  --bg: #edeee8;
+  --bg-subtle: #e5e7df;
+  --bg-inset: #dcdfd5;
+  --surface: #f7f8f3;
   --surface-raised: #ffffff;
-  --surface-inverted: #121212;
-  --text-inverted: #f8f9fa;
+  --surface-inverted: #11150f;
+  --text-inverted: #edeee8;
 
   /* --- Texto ------------------------------------------------------------ */
-  --text: #121212;
-  --text-secondary: #45484d;
-  --text-muted: #6b7078;
-  --text-on-brand: #ffffff;
+  --text: #11150f;
+  --text-secondary: #3d453a;
+  --text-muted: #6c7466;
+  --text-on-brand: #11150f; /* tinta sobre latão — 6.3:1 */
+  /* A cortina clareia no tema escuro para se destacar do fundo, e aí texto
+     branco por cima dela cai para 3.1:1. Quem inverte é a tinta, não a cor. */
+  --text-on-accent: #ffffff;
 
   /* --- Traços ----------------------------------------------------------- */
-  --border: #e3e6ea;
-  --border-strong: #cfd4da;
-  --focus-ring: color-mix(in srgb, var(--brand-500) 45%, transparent);
+  --border: #d3d7c9;
+  --border-strong: #b4bba7;
+  --focus-ring: color-mix(in srgb, var(--brand-ink) 40%, transparent);
 
-  /* --- Sombras ---------------------------------------------------------- */
-  --shadow-sm: 0 1px 2px rgb(18 18 18 / 6%), 0 1px 3px rgb(18 18 18 / 4%);
-  --shadow-md: 0 4px 12px rgb(18 18 18 / 8%), 0 2px 4px rgb(18 18 18 / 4%);
-  --shadow-lg: 0 16px 40px rgb(18 18 18 / 12%), 0 4px 12px rgb(18 18 18 / 6%);
+  /* --- Sombras ----------------------------------------------------------
+     Quase nada. Só o que de fato flutua sobre o resto — painel grudento,
+     cabeçalho, canhoto — ganha sombra, e ainda assim rasa. */
+  --shadow-sm: 0 1px 0 rgb(17 21 15 / 6%);
+  --shadow-md: 0 1px 0 rgb(17 21 15 / 7%), 0 10px 26px -14px rgb(17 21 15 / 22%);
+  --shadow-lg: 0 24px 60px -26px rgb(17 21 15 / 32%);
 
-  /* --- Tipografia ------------------------------------------------------- */
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+  /* --- Tipografia -------------------------------------------------------
+     Três papéis, três fontes, cada uma escolhida pelo que faz.
+
+     Big Shoulders Display nasceu para sinalização de rua: estreita, alta,
+     legível de longe. É a letra de marquise, e é ela que dá o nome do evento.
+
+     IBM Plex Sans carrega o texto corrido. Plex Mono carrega tudo que é dado:
+     preço, hora, contagem regressiva, código do ingresso, número do pedido.
+     Num site de bilheteria quase metade da tela é número, e número alinhado em
+     coluna com largura fixa é mais fácil de comparar do que número em fonte
+     proporcional. */
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
 
-  /* Escala tipográfica: display para o hero, e daí para baixo. */
-  --text-display: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
-  --text-h1: clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem);
-  --text-h2: clamp(1.375rem, 1.15rem + 0.9vw, 1.75rem);
-  --text-h3: 1.125rem;
+  /* A display é condensada: no mesmo corpo ela ocupa bem menos largura e lê
+     menor que uma grotesca normal. A escala compensa isso subindo. */
+  --text-display: clamp(3.25rem, 1.4rem + 8vw, 7rem);
+  --text-h1: clamp(2.25rem, 1.55rem + 2.8vw, 3.5rem);
+  --text-h2: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+  --text-h3: 1.25rem;
   --text-body: 0.9375rem;
   --text-sm: 0.8125rem;
   --text-xs: 0.6875rem;
 
-  /* --- Espaço e forma --------------------------------------------------- */
+  /* Etiqueta: mono, caixa alta, entrelinha aberta. É o que marca uma seção
+     sem precisar de um título de verdade. */
+  --tracking-label: 0.14em;
+
+  /* --- Espaço e forma ---------------------------------------------------- */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -75,65 +108,88 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
   --space-7: 3rem;
-  --space-8: 4rem;
+  --space-8: 4.5rem;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* Ingresso não tem canto redondo de aplicativo. O raio some quase inteiro —
+     o que separa as coisas aqui é régua e espaço, não curva. */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
   --radius-pill: 999px;
 
-  --shell-width: 1200px;
-  --header-height: 68px;
+  /* --- Ingresso ---------------------------------------------------------- */
+  --notch: 16px; /* diâmetro do entalhe que faz a picotagem parecer rasgada */
+  --stub: 72px; /* largura do canhoto destacável do cartão de evento */
 
-  /* Uma curva só para tudo que se move. */
+  /* --- Marquise ----------------------------------------------------------
+     O painel do topo é escuro nos dois temas, de propósito: marquise de
+     teatro é escura, e por cima dela vai a foto do local. Uma marquise que
+     clareia junto com o tema vira texto branco sobre fundo claro na metade das
+     visitas — foi assim que a versão anterior quase se apagou.
+
+     É o mesmo caso do fundo branco do QR: contexto fixo, cor fixa. Por isso
+     estes três tokens são declarados uma vez e não reaparecem nos blocos de
+     tema escuro. */
+  --marquee: #11150f;
+  --marquee-text: #f2f3ec;
+  --marquee-dim: #a8b09f;
+  --marquee-rule: #2f362b;
+
+  --shell-width: 1240px;
+  --header-height: 64px;
+
+  /* Uma curva só para tudo que se move, e uma segunda duração para o único
+     momento que merece ser visto: o pedido mudando de estado sozinho. */
   --ease: cubic-bezier(0.2, 0, 0.1, 1);
-  --duration: 160ms;
+  --duration: 140ms;
+  --duration-slow: 420ms;
 
   color-scheme: light;
 }
 
 /* --------------------------------------------------------------------------
-   Escuro.
-   Não é a paleta clara invertida: o azul de marca puro (#0052ff) sobre fundo
-   quase preto fica abaixo do contraste mínimo, então clareia. O fundo também
-   não é preto puro — sombra nenhuma aparece sobre #000, e a hierarquia de
-   profundidade some junto.
+   Escuro: a casa com a luz baixa.
+   Não é a paleta clara invertida. O latão de botão precisa clarear para a
+   tinta continuar legível por cima dele, e o fundo não é preto puro — sombra
+   nenhuma aparece sobre #000, e a hierarquia de profundidade some junto.
    -------------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --brand-50: #101a33;
-    --brand-100: #16244a;
-    --brand-200: #1d3269;
-    --brand-500: #4d84ff;
-    --brand-600: #3a72f2;
-    --brand-700: #2c5fd6;
+    --brand-500: #d6a63c;
+    --brand-ink: #e3b95c;
+    --brand-600: #c29331;
+    --brand-700: #a97e27;
+    --brand-50: #241d0c;
+    --brand-100: #33290f;
+    --brand-200: #4a3a13;
 
-    --accent-500: #ff6a3d;
-    --accent-600: #e85526;
+    --accent-500: #e0705f;
+    --accent-600: #c85a4a;
 
-    --success-500: #35b57e;
-    --warning-500: #d99423;
+    --success-500: #4fa97a;
+    --warning-500: #d3a03a;
 
-    --bg: #0b0b0d;
-    --bg-subtle: #121215;
-    --bg-inset: #1a1a1f;
-    --surface: #141418;
-    --surface-raised: #1c1c22;
-    --surface-inverted: #f8f9fa;
-    --text-inverted: #121212;
+    --bg: #0c0f0b;
+    --bg-subtle: #121611;
+    --bg-inset: #1a1f18;
+    --surface: #141812;
+    --surface-raised: #1d221b;
+    --surface-inverted: #edeee8;
+    --text-inverted: #11150f;
 
-    --text: #f2f3f5;
-    --text-secondary: #c3c7ce;
-    --text-muted: #8d939d;
-    --text-on-brand: #ffffff;
+    --text: #e9ebe3;
+    --text-secondary: #b4baad;
+    --text-muted: #838b7d;
+    --text-on-brand: #11150f;
+    --text-on-accent: #11150f;
 
-    --border: #26262d;
-    --border-strong: #35353f;
+    --border: #262b23;
+    --border-strong: #3b422f;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
-    --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+    --shadow-sm: 0 1px 0 rgb(0 0 0 / 40%);
+    --shadow-md: 0 1px 0 rgb(0 0 0 / 40%), 0 10px 26px -14px rgb(0 0 0 / 70%);
+    --shadow-lg: 0 24px 60px -26px rgb(0 0 0 / 80%);
 
     color-scheme: dark;
   }
@@ -142,38 +198,40 @@
 /* A escolha explícita vence os dois lados: escuro num sistema claro e
    claro num sistema escuro. */
 :root[data-theme='dark'] {
-  --brand-50: #101a33;
-  --brand-100: #16244a;
-  --brand-200: #1d3269;
-  --brand-500: #4d84ff;
-  --brand-600: #3a72f2;
-  --brand-700: #2c5fd6;
+  --brand-500: #d6a63c;
+  --brand-ink: #e3b95c;
+  --brand-600: #c29331;
+  --brand-700: #a97e27;
+  --brand-50: #241d0c;
+  --brand-100: #33290f;
+  --brand-200: #4a3a13;
 
-  --accent-500: #ff6a3d;
-  --accent-600: #e85526;
+  --accent-500: #e0705f;
+  --accent-600: #c85a4a;
 
-  --success-500: #35b57e;
-  --warning-500: #d99423;
+  --success-500: #4fa97a;
+  --warning-500: #d3a03a;
 
-  --bg: #0b0b0d;
-  --bg-subtle: #121215;
-  --bg-inset: #1a1a1f;
-  --surface: #141418;
-  --surface-raised: #1c1c22;
-  --surface-inverted: #f8f9fa;
-  --text-inverted: #121212;
+  --bg: #0c0f0b;
+  --bg-subtle: #121611;
+  --bg-inset: #1a1f18;
+  --surface: #141812;
+  --surface-raised: #1d221b;
+  --surface-inverted: #edeee8;
+  --text-inverted: #11150f;
 
-  --text: #f2f3f5;
-  --text-secondary: #c3c7ce;
-  --text-muted: #8d939d;
-  --text-on-brand: #ffffff;
+  --text: #e9ebe3;
+  --text-secondary: #b4baad;
+  --text-muted: #838b7d;
+  --text-on-brand: #11150f;
+  --text-on-accent: #11150f;
 
-  --border: #26262d;
-  --border-strong: #35353f;
+  --border: #262b23;
+  --border-strong: #3b422f;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-  --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
-  --shadow-lg: 0 18px 44px rgb(0 0 0 / 55%);
+  --shadow-sm: 0 1px 0 rgb(0 0 0 / 40%);
+  --shadow-md: 0 1px 0 rgb(0 0 0 / 40%), 0 10px 26px -14px rgb(0 0 0 / 70%);
+  --shadow-lg: 0 24px 60px -26px rgb(0 0 0 / 80%);
 
   color-scheme: dark;
 }
