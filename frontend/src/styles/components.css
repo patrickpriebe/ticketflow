@@ -1181,6 +1181,42 @@
     padding-inline: var(--space-1);
   }
 
+  /* Com sessão o cabeçalho ganha "Meus pedidos", o chip do usuário e "Sair" —
+     427px de conteúdo numa tela de 375. Deslogado ele cabia, que foi por onde a
+     primeira medição passou.
+
+     O primeiro nome sai e a inicial fica: ela já responde "quem está aqui", que
+     é a pergunta que o chip existe para responder. */
+  .user-name {
+    display: none;
+  }
+
+  .user-chip {
+    padding: 0.25rem;
+  }
+
+  /* O nome da marca sai e o símbolo fica. Junto com o chip encolhido é o que
+     faz o cabeçalho logado caber: com sessão ele carrega marca, dois links de
+     menu, o chip e o botão de sair, e a soma passava de 430px numa tela de 375.
+     Continua acessível — o texto some da tela, não da árvore. */
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Caixa alta com entrelinha aberta é bonita e é larga. No telefone o menu
+     aperta o espaçamento em vez de sumir: perder "Meus pedidos" custaria a
+     única rota para os ingressos já comprados. */
+  .nav-link {
+    letter-spacing: 0.05em;
+  }
+
   /* O canhoto encolhe junto: 72px num cartão de 343px é um quinto da largura
      só para dizer a data. */
   .event-ticket,

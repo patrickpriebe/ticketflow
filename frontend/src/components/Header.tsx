@@ -27,7 +27,9 @@ export function Header({ session, route, onSignOut }: Props) {
           <span className="brand-mark" aria-hidden="true">
             <Icon name="ticket" size={17} />
           </span>
-          TicketFlow
+          {/* O nome sai no telefone e o símbolo fica. O link continua tendo
+              nome acessível pelo texto, que só está escondido visualmente. */}
+          <span className="brand-name">TicketFlow</span>
         </a>
 
         <nav className="header-nav">
@@ -71,7 +73,10 @@ export function Header({ session, route, onSignOut }: Props) {
                 <span className="avatar" aria-hidden="true">
                   {session.name.charAt(0).toUpperCase()}
                 </span>
-                {session.name.split(' ')[0]}
+                {/* O primeiro nome sai no telefone e a inicial fica. Envolvido
+                    num elemento porque CSS não esconde nó de texto solto — e
+                    sem isso o cabeçalho logado pedia 427px numa tela de 375. */}
+                <span className="user-name">{session.name.split(' ')[0]}</span>
               </span>
               <button className="btn btn-ghost btn-sm" onClick={onSignOut}>
                 Sair
