@@ -1219,10 +1219,14 @@
 }
 
 /* A lista aberta é desenhada pelo sistema operacional, não por nós; o que cabe
-   aqui é o campo fechado. `text-overflow` porque a opção traz o nome e a
-   descrição — o nome é o que precisa caber. */
+   aqui é o campo fechado.
+
+   Sem `max-width`: um <select> nativo já se dimensiona pela opção mais larga, e
+   qualquer teto em `ch` erra — a unidade acompanha o corpo da fonte, e no
+   cabeçalho ele é menor, então o mesmo valor que servia no rodapé cortava
+   "Bilheteria" em "Bilhete…". Fora isso o campo ainda reserva uns 20px para a
+   seta, que `ch` nenhum enxerga. */
 .skin-select {
-  max-width: 15ch;
   padding: 0.3125rem 0.5rem;
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -1230,7 +1234,6 @@
   color: var(--text);
   font-size: var(--text-sm);
   font-weight: 600;
-  text-overflow: ellipsis;
   transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 
@@ -1254,7 +1257,6 @@
 }
 
 .site-header .skin-select {
-  max-width: 11ch;
   font-size: var(--text-xs);
 }
 

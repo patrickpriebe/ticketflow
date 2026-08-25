@@ -116,7 +116,13 @@ async function main() {
 
   console.log('Abrindo um evento e montando o carrinho…');
   // O primeiro cartão da grade, seja qual for o seed do dia.
-  await page.locator('.event-card a').first().click();
+  //
+  // `.stretched` e não `.event-card a`: a pele de bilheteria — que é o padrão,
+  // e portanto a que estas imagens fotografam — usa `.event-ticket`, não
+  // `.event-card`. O seletor antigo casava só com as peles de layout
+  // retangular, e o roteiro morria esperando 30s por um elemento que a tela não
+  // tinha. `.stretched` é o link esticado do cartão e existe nas quatro.
+  await page.locator('.stretched').first().click();
   await page.waitForURL(/\/events\/[0-9a-f-]{36}/);
   await settle(page);
   await shot(page, '03-event');

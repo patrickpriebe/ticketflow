@@ -219,6 +219,42 @@ The other services copy these choices rather than reinventing them.
   file and the Kubernetes ConfigMap turn it on. Open, `/actuator/prometheus` gives away
   order volume, approved and declined amounts, every route and the JVM version.
 
+## Frontend: the skin system
+
+The site ships four complete designs on an axis separate from light/dark, chosen by the
+visitor and stored in `data-skin` on `<html>`. `boxoffice` is the default; `stage`
+and `poster` are the two redesign directions; `classic` is the original.
+
+- **Every skin reuses the same token *names*.** A file of values under
+  `src/styles/skins/` is most of a skin. Renaming a token to suit one skin means
+  editing every rule that reads it — do not.
+- **`skins/flat.css` holds the rectangular layout** shared by `classic`, `stage` and
+  `poster`. It is scoped `:not([data-skin='boxoffice'])` rather than a list of skins,
+  so a new flat skin works without touching it. A list would mean a screen with no
+  styling at all the day somebody forgets to add a name to it.
+- **Per-skin overrides must be written `:root[data-skin='…']`.** `flat.css` selectors
+  carry two attributes and score (0,3,0); a plain `[data-skin='poster'] h1` scores
+  (0,2,0) and loses **in silence**. That is how the Cartaz headings stayed in the
+  grotesque and its date badge kept showing on a grid that has no date badge.
+- **A skin rule that sets a grid needs a width guard.** The same (0,3,0) beats the
+  `@media (max-width: 1000px)` collapse in `views.css`, which is (0,1,0). Without the
+  guard the filter rail stayed 240px wide on a phone and the whole page scrolled
+  sideways.
+- **Only two components change markup with the skin** — the event card and the top of
+  the home page — and both branch on `usesFlatLayout()`. Everything else is CSS. Adding
+  a third branch is a sign the skin wants a token instead.
+- **The skin control renders twice and holds no state.** Both copies read `useSkin()`,
+  which is `useSyncExternalStore` over the same attribute the CSS reads. A `useState`
+  per instance made the header and the footer disagree, with two controls showing
+  different answers at once. Anything rendered twice needs `useId` too: fixed ids made
+  every `aria-labelledby` point at the first copy.
+- **Fonts are served by the site, never by a CDN.** `font-src 'self'` in the CSP, same
+  decision already taken for the venue photographs. Only the `latin` subsets are
+  preloaded; `latin-ext` is declared and fetched only if a character needs it.
+- **`capture.mjs` selects `.stretched`, not `.event-card a`.** The default skin has no
+  `.event-card`, and the old selector made the screenshot script hang for thirty
+  seconds against a screen that was working fine.
+
 ## Deployment traps that already cost a red deploy
 
 - **A `sync: false` variable is not created by an automatic blueprint sync.** Render has

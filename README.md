@@ -72,6 +72,10 @@ cd frontend && npm run dev
 node scripts/screenshots/capture.mjs
 ```
 
+Every shot below is the default skin, `boxoffice`. The site carries three others and a
+control in the header switches between them live — see
+[Four complete designs](#frontend).
+
 ### Browsing
 
 | | |
@@ -469,8 +473,9 @@ attention than it saves.
 
 Seven routes with real URLs: home, discover, event, checkout, order, my orders, sign in.
 
-- **A design system in CSS custom properties.** Every colour comes from
-  `styles/tokens.css`; no component writes a hex value.
+- **A design system in CSS custom properties.** No component writes a hex value: colours
+  come from `styles/tokens.css` and, for the other skins, from one file of values each.
+  A component that writes its own hex is a component the dark theme never reaches.
 - **Three-state theming** — light, dark, and *system*. Without the third, whoever chose
   once is stuck with that choice, and almost nobody returns to fix it.
 - **Four complete designs, switchable live.** `boxoffice` — bone paper, brass, signage

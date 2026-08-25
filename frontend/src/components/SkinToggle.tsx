@@ -34,18 +34,27 @@ export function SkinToggle() {
         Desenho
       </label>
 
+      {/* A opção carrega só o nome. O campo fechado mostra o texto da opção
+          escolhida, então juntar nome e descrição ali deixava "Bilh…" no
+          cabeçalho. A descrição de cada desenho vira legenda de leitor de
+          tela, fora do texto que precisa caber na linha. */}
       <select
         id={id}
         className="skin-select"
         value={skin}
+        aria-describedby={`${id}-hint`}
         onChange={(event) => applySkin(event.target.value as Skin)}
       >
         {SKINS.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label} — {option.hint}
+            {option.label}
           </option>
         ))}
       </select>
+
+      <span className="sr-only" id={`${id}-hint`}>
+        {SKINS.map((option) => `${option.label}: ${option.hint}.`).join(' ')}
+      </span>
     </div>
   );
 }

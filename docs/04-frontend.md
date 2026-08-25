@@ -112,14 +112,18 @@ Exactly **two** places change markup rather than styling, and both branch in Rea
 palette follows the skin too — a box office poster inside the blue rounded card, or a blue
 one on warm paper, does not look like the same site.
 
-## Design system
+## Design system: the box office skin
 
 Everything comes from `src/styles/tokens.css`. **No component writes a hex value** — if
 one does, the dark theme never reaches that part of the screen, and that is always how a
 dark mode ends up half-finished.
 
-The direction is a **box office**: bone paper, near-black ink, brass fittings, and the
-red of the curtain kept for the things that go wrong. There is no product blue anywhere,
+What follows describes `boxoffice`, the default. The other three carry their own values
+for the same token names; `stage` and `classic` are built on the brand blue this one
+refuses.
+
+Its direction is a **box office**: bone paper, near-black ink, brass fittings, and the
+red of the curtain kept for the things that go wrong. There is no product blue in it,
 because the subject is a theatre and a stadium, not a dashboard.
 
 - **Brass** — the hardware. Two values, not one: `--brand-500` fills buttons and markers,
