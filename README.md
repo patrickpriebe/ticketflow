@@ -370,8 +370,12 @@ hand out a ticket nobody paid for; calling it failed would cancel a valid order.
 - The `client_secret` is **never persisted**. It is read from Stripe on demand by the
   charge id we already store, and only while there is still something to confirm.
 
-A simulated gateway (WireMock) remains available for local development, so the whole
-system runs without an account at any provider.
+A simulated gateway (WireMock) covers the case Stripe cannot. It is what the whole
+system runs against locally — no account at any provider needed — and it is also what
+the **deployed** environment uses today: this Stripe account has no PIX, and card and
+boleto only settle when somebody confirms in the browser, so no purchase ever closed
+on the published site. The Stripe path stays wired and tested; switching back is one
+variable (`TICKETFLOW_GATEWAY_PROVIDER`).
 
 ---
 
@@ -516,9 +520,10 @@ visão geral** dashboard provisioned. No login, nothing to click.
 That capture is real traffic against the local stack, produced by the same script that
 generates the product screenshots (`node scripts/screenshots/capture.mjs grafana`).
 
-The webhook panel reads *No data* on purpose: locally the payment provider is the
-simulated gateway, so no Stripe callback ever arrives. It fills up in the deployed
-environment, which is the only place a real webhook exists.
+The webhook panel reads *No data* on purpose: the payment provider is the simulated
+gateway, so no Stripe callback ever arrives. It only fills up when
+`TICKETFLOW_GATEWAY_PROVIDER` is switched back to `stripe`, which is the only
+configuration where a real webhook exists.
 
 Eleven panels, each answering a question that only exists because the system is
 asynchronous:
