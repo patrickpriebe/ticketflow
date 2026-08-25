@@ -83,6 +83,33 @@ services:
         sync: false
 
   # -------------------------------------------------------------- payment ----
+  # ------------------------------------------------------------- gateway ----
+  # O provedor de pagamento simulado.
+  #
+  # Ele sobe aqui pelo mesmo motivo que existe localmente: sem provedor de
+  # verdade habilitado para os três meios, PIX não tinha implementação no Stripe
+  # e cartão e boleto ficavam esperando uma confirmação que só acontece no
+  # navegador. O ambiente publicado é uma demonstração, e uma demonstração em que
+  # nenhuma compra fecha não demonstra nada.
+  #
+  # O código do Stripe continua no lugar e testado — a troca é de estratégia e de
+  # URL, que é exatamente o que a porta `PaymentGateway` existe para permitir.
+  - type: web
+    name: ticketflow-gateway
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./infra/wiremock/Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      # A API de administração fica trancada: publicada aberta, ela deixa
+      # qualquer pessoa cadastrar uma regra e escolher o desfecho de toda
+      # cobrança deste ambiente. Ausente, o entrypoint sorteia uma senha e
+      # ninguém entra — o padrão já é o seguro, sem depender de lembrar.
+      - key: GATEWAY_ADMIN_AUTH
+        sync: false
+
   - type: web
     name: ticketflow-payment
     runtime: docker
@@ -97,10 +124,18 @@ services:
         value: cloud
       - key: JAVA_TOOL_OPTIONS
         value: -XX:MaxRAMPercentage=75
-      # O provedor de verdade. O gateway simulado não sobe: ele existe para o
-      # ambiente local, e aqui quem responde é o Stripe.
+      # O simulado. Com o Stripe desta conta, PIX não tem implementação e cartão
+      # e boleto só fecham com a confirmação do navegador — nenhuma compra
+      # chegava a "pago" no ambiente publicado.
+      #
+      # Trocar para `stripe` continua sendo uma variável: a estratégia está
+      # escrita, testada, e o caso de uso não sabe qual das duas está atendendo.
       - key: TICKETFLOW_GATEWAY_PROVIDER
-        value: stripe
+        value: http
+      - key: TICKETFLOW_GATEWAY_BASE_URL
+        value: https://ticketflow-gateway.onrender.com
+      # As chaves do Stripe ficam: elas não custam nada paradas, e sem elas
+      # voltar para o provedor de verdade exigiria preencher o painel de novo.
       - key: STRIPE_SECRET_KEY
         sync: false
       # Vem do endpoint de webhook cadastrado no painel do Stripe, apontando para

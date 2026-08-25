@@ -41,3 +41,42 @@ Os quatro cenários que o roadmap exige já estão cobertos automaticamente em
 `HttpPaymentGatewayTest`, que sobe o Wiremock em processo. Para reproduzir à mão aqui,
 adicione um stub com `"fixedDelayMilliseconds"` maior que o `read-timeout` do serviço
 (5s), ou com `"status": 503`.
+
+## Este contêiner também roda no ambiente publicado
+
+Ele começou como peça de desenvolvimento, e por um tempo o ambiente publicado
+usava o Stripe de verdade. Não deu certo para uma demonstração: nesta conta o
+Stripe não tem PIX habilitado, e cartão e boleto só fecham quando alguém confirma
+no navegador. O resultado é que **nenhuma compra chegava a "pago"** lá — o pedido
+ficava aguardando pagamento até o job de expiração devolver os ingressos.
+
+Então o simulado subiu junto. O código do Stripe continua escrito, testado e a uma
+variável de distância: `TICKETFLOW_GATEWAY_PROVIDER` escolhe qual das duas
+estratégias atende, e o caso de uso não sabe a diferença — que é exatamente o que
+a porta `PaymentGateway` existe para permitir.
+
+O [`Dockerfile`](Dockerfile) assa as regras na imagem, porque hospedagem não monta
+volume do repositório. O compose constrói o **mesmo** arquivo e ainda monta
+`mappings/` por cima, para continuar valendo a pena editar um stub sem
+reconstruir nada.
+
+### A API de administração é trancada por padrão
+
+O [`entrypoint.sh`](entrypoint.sh) decide, e a regra é a que o resto do projeto já
+aprendeu doendo: **variável ausente significa trancado**. Sem `GATEWAY_ADMIN_AUTH`
+ele sorteia uma senha no boot e ninguém entra.
+
+Abrir exige um "sim" explícito, `GATEWAY_ADMIN_OPEN=true`, e é o que o compose
+passa. Publicada aberta, a API de administração deixa qualquer pessoa cadastrar
+uma regra nova e escolher o desfecho de toda cobrança do ambiente — o mesmo tipo
+de porta que `dev-tokens` e `/actuator/prometheus` já custaram a este projeto.
+
+### Prazos maiores no perfil de nuvem
+
+`connect-timeout` e `read-timeout` sobem para 10s e 45s em `cloud`, e isso não é
+afrouxamento: é outro problema. Os cinco segundos do perfil base existem para que
+um trabalhador de pagamento não fique pendurado num provedor morto. Aqui o
+provedor não está morto — está hibernando, porque instância gratuita dorme depois
+de quinze minutos ociosa. Com os prazos curtos, a primeira compra depois de um
+período parado esgotava as três tentativas em menos de dez segundos e ia para a
+fila de mensagens mortas.

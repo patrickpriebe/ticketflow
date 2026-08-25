@@ -238,13 +238,26 @@ services:
   # ---------------------------------------------------------------------------
   payment-gateway:
     profiles: [apps]
-    image: wiremock/wiremock:3.9.2
+    # Construído a partir do mesmo Dockerfile que a hospedagem usa, em vez da
+    # imagem crua. Duas definições do mesmo contêiner divergem — e a que diverge
+    # em silêncio é sempre a que não roda na sua máquina.
+    build:
+      context: .
+      dockerfile: infra/wiremock/Dockerfile
     container_name: ticketflow-payment-gateway
     restart: unless-stopped
-    command: ["--global-response-templating", "--disable-banner"]
+    environment:
+      # Aqui a API de administração fica aberta: inspecionar o que o Payment
+      # Service enviou, com header de idempotência e tudo, é metade da utilidade
+      # deste contêiner em desenvolvimento. Publicado, o padrão do script é o
+      # contrário — trancado sem precisar de configuração.
+      GATEWAY_ADMIN_OPEN: "true"
     ports:
       - "${PAYMENT_GATEWAY_PORT:-8090}:8080"
     volumes:
+      # As regras continuam vindo do disco no desenvolvimento, por cima das que a
+      # imagem trouxe: editar um arquivo e recarregar vale mais do que
+      # reconstruir a imagem a cada ajuste de stub.
       - ./infra/wiremock/mappings:/home/wiremock/mappings:ro
     networks: [ticketflow]
 

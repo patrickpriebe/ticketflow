@@ -276,6 +276,18 @@ spring:
 
 ticketflow:
   gateway:
-    # Continua sendo o gateway simulado até a fase do Stripe. A troca é de URL e
-    # de estratégia — o resto do serviço não sabe quem está do outro lado.
+    # A troca é de URL e de estratégia — o resto do serviço não sabe quem está do
+    # outro lado.
     base-url: ${TICKETFLOW_GATEWAY_BASE_URL}
+    # Prazos maiores do que no perfil base, e não é afrouxamento: é outro
+    # problema.
+    #
+    # Cinco segundos existem para que um trabalhador de pagamento não fique
+    # pendurado num provedor morto. Aqui o provedor não está morto — está
+    # hibernando, porque instância gratuita dorme depois de quinze minutos
+    # ociosa e leva algumas dezenas de segundos para acordar. Com os prazos
+    # curtos, a primeira compra depois de um período parado esgotava as três
+    # tentativas em menos de dez segundos e ia para a fila de mensagens mortas,
+    # deixando o pedido pendurado em "aguardando pagamento" para sempre.
+    connect-timeout: ${TICKETFLOW_GATEWAY_CONNECT_TIMEOUT:10s}
+    read-timeout: ${TICKETFLOW_GATEWAY_READ_TIMEOUT:45s}
