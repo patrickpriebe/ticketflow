@@ -24,12 +24,12 @@
   ],
   "rewrites": [
     {
-      "source": "/api/v1/tickets/:path*",
-      "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets/:path*"
-    },
-    {
       "source": "/api/v1/tickets",
       "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets"
+    },
+    {
+      "source": "/api/v1/tickets/:path*",
+      "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets/:path*"
     },
     {
       "source": "/api/v1/payments/:path*",
