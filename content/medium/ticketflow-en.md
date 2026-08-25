@@ -1,4 +1,4 @@
-# The Bugs That Designed My Architecture
+# When Two Services Stop Sharing a Transaction
 
 ## What building a distributed ticket-selling system actually taught me
 
