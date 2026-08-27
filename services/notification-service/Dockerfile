@@ -1,7 +1,7 @@
 # Build context is the REPOSITORY ROOT:
 #   docker build -f services/notification-service/Dockerfile .
 
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3-eclipse-temurin-26 AS build
 WORKDIR /workspace
 
 COPY services/notification-service/pom.xml ./services/notification-service/pom.xml
