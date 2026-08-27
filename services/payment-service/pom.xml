@@ -116,7 +116,7 @@
             <groupId>com.stripe</groupId>
             <artifactId>stripe-java</artifactId>
             <!-- Última estável no Maven Central; as `-beta` ficam de fora. -->
-            <version>29.2.0</version>
+            <version>33.3.0</version>
         </dependency>
 
         <dependency>
