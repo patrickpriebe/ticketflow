@@ -2,7 +2,7 @@
 #   docker build -f services/order-service/Dockerfile .
 # The build needs contracts/openapi/, which the pom copies into the jar.
 
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3-eclipse-temurin-26 AS build
 WORKDIR /workspace
 
 # Dependencies first: this layer is only invalidated when the pom changes, so
