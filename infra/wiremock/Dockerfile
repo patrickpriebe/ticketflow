@@ -9,7 +9,7 @@
 # infelizes sejam reproduzíveis: ninguém consegue pedir a um provedor real que dê
 # timeout sob demanda, e o corte em 2000 dá aprovação e recusa sem editar nada.
 # ==============================================================================
-FROM wiremock/wiremock:3.9.2
+FROM wiremock/wiremock:3.13.2-3
 
 COPY infra/wiremock/mappings /home/wiremock/mappings
 
