@@ -1,0 +1,95 @@
+# =============================================================================
+# Atualização de dependências.
+#
+# Existe porque a varredura de segurança do repositório cobre o código escrito
+# aqui e não cobre o que vem de fora. Vulnerabilidade em dependência não aparece
+# em revisão nem em teste: aparece num boletim, semanas depois, e só encontra
+# quem estava olhando.
+#
+# Semanal e agrupado de propósito. Diário abre PR demais, e um fluxo que ninguém
+# lê protege tanto quanto nenhum — a mesma razão pela qual um painel de Grafana
+# sempre vazio é pior que painel nenhum.
+#
+# Atualização de segurança vem fora do agrupamento e fora da janela: o GitHub
+# abre na hora que o boletim sai, que é quando ela importa.
+# =============================================================================
+version: 2
+
+updates:
+  # --- Os três serviços Java ------------------------------------------------
+  # Um bloco por serviço: são projetos Maven independentes, sem POM pai, e é
+  # essa independência que permite atualizar um sem mexer nos outros.
+  - package-ecosystem: maven
+    directory: /services/order-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      spring:
+        patterns: ["org.springframework*", "org.springframework.boot*"]
+      test:
+        patterns: ["org.junit*", "org.mockito*", "org.assertj*", "com.github.tomakehurst*"]
+
+  - package-ecosystem: maven
+    directory: /services/payment-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      spring:
+        patterns: ["org.springframework*", "org.springframework.boot*"]
+      test:
+        patterns: ["org.junit*", "org.mockito*", "org.assertj*", "com.github.tomakehurst*"]
+
+  - package-ecosystem: maven
+    directory: /services/notification-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      spring:
+        patterns: ["org.springframework*", "org.springframework.boot*"]
+      test:
+        patterns: ["org.junit*", "org.mockito*", "org.assertj*"]
+
+  # --- Frontend -------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react*"]
+      build:
+        patterns: ["vite", "@vitejs/*", "typescript"]
+
+  # Ferramenta de captura de tela, não vai para produção. Só o que for correção
+  # de segurança interessa aqui.
+  - package-ecosystem: npm
+    directory: /scripts/screenshots
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+
+  # --- Pipeline -------------------------------------------------------------
+  # As actions de terceiros rodam com o token do repositório. Versão presa e
+  # desatualizada é risco de cadeia de suprimentos, não só de recurso perdido.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  # --- Imagens base ---------------------------------------------------------
+  # A imagem base carrega a JVM e o sistema: CVE de OpenSSL chega por aqui, não
+  # pelo pom.
+  - package-ecosystem: docker
+    directories:
+      - /services/order-service
+      - /services/payment-service
+      - /services/notification-service
+      - /infra/wiremock
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2

@@ -34,6 +34,14 @@ on:
   # Para acordar tudo antes de uma demonstração fora da janela.
   workflow_dispatch:
 
+# Este job só faz GET em URL pública: não clona o repositório, não lê segredo,
+# não escreve nada. Sem este bloco ele herdaria o padrão do repositório — hoje
+# `read`, mas isso é configuração de painel, fora deste arquivo. Alguém elevar o
+# padrão amanhã elevaria este workflow junto, em silêncio. Declarar aqui prende
+# o privilégio ao que o job realmente precisa.
+permissions:
+  contents: read
+
 # Duas execuções simultâneas não fazem sentido: a segunda acordaria o que a
 # primeira já acordou.
 concurrency:
