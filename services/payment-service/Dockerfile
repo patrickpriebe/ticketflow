@@ -1,7 +1,7 @@
 # Build context is the REPOSITORY ROOT:
 #   docker build -f services/payment-service/Dockerfile .
 
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3-eclipse-temurin-26 AS build
 WORKDIR /workspace
 
 COPY services/payment-service/pom.xml ./services/payment-service/pom.xml
