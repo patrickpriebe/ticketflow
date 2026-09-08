@@ -39,13 +39,13 @@ VALUES
      'Jazz na Fábrica · Quinteto Noturno',
      'Uma noite de jazz autoral em formato intimista, com o quinteto apresentando o disco novo na íntegra. Casa com mesas, lotação reduzida e som acústico.',
      'Sesc Pompeia', 'São Paulo',
-     '2026-09-05 23:30:00+00', '2026-05-10 13:00:00+00', '2026-09-05 21:00:00+00', 'ON_SALE'),
+     '2026-12-04 23:30:00+00', '2026-05-10 13:00:00+00', '2026-12-04 21:00:00+00', 'ON_SALE'),
 
     ('55555555-5555-4555-8555-555555555555',
      'Stand-up · A Vida É Isso Aí',
      'Turnê nacional do espetáculo solo, com material inédito escrito no último ano. Classificação 16 anos. Não é permitido gravar durante a apresentação.',
      'Teatro Rival', 'Rio de Janeiro',
-     '2026-08-29 23:00:00+00', '2026-06-15 13:00:00+00', '2026-08-29 20:00:00+00', 'ON_SALE'),
+     '2026-11-27 23:00:00+00', '2026-06-15 13:00:00+00', '2026-11-27 20:00:00+00', 'ON_SALE'),
 
     ('66666666-6666-4666-8666-666666666666',
      'Clássico Regional · Semifinal',
