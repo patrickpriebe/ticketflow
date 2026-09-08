@@ -30,7 +30,11 @@ export function SkinToggle() {
 
   return (
     <div className="skin-toggle">
-      <label className="skin-toggle-label" htmlFor={id}>
+      {/* O rótulo some da tela e continua no leitor: um <select> sem nome
+          acessível é lido como "caixa de combinação" e mais nada. O que ele
+          escolhe já se descobre abrindo — o campo fechado mostra o nome do
+          desenho em vigor, que é a resposta que a palavra dava. */}
+      <label className="sr-only" htmlFor={id}>
         Desenho
       </label>
 

@@ -877,14 +877,6 @@
 /* --- Seletor de desenho ------------------------------------------------------
    O controle é o mesmo nos dois; só a roupa muda. */
 
-[data-skin]:not([data-skin='boxoffice']) .skin-toggle-label {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
 [data-skin]:not([data-skin='boxoffice']) .skin-select {
   border-color: var(--border-strong);
 }

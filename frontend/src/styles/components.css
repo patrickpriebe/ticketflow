@@ -1246,16 +1246,6 @@
   gap: var(--space-2);
 }
 
-.skin-toggle-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
 /* A lista aberta é desenhada pelo sistema operacional, não por nós; o que cabe
    aqui é o campo fechado.
 
