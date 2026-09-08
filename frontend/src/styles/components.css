@@ -738,7 +738,9 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  border: 1px solid var(--border-strong);
+  /* --border-strong é ~1.7:1 contra --bg no tema claro — abaixo do mínimo de
+     3:1 para contorno de componente. O anel usa a mesma cor do número. */
+  border: 1px solid var(--text-muted);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
