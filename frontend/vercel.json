@@ -24,6 +24,14 @@
   ],
   "rewrites": [
     {
+      "source": "/wake/payment",
+      "destination": "https://ticketflow-payment.onrender.com/actuator/health/liveness"
+    },
+    {
+      "source": "/wake/notification",
+      "destination": "https://ticketflow-notification.onrender.com/actuator/health/liveness"
+    },
+    {
       "source": "/api/v1/tickets",
       "destination": "https://ticketflow-notification.onrender.com/api/v1/tickets"
     },

@@ -13,6 +13,20 @@ export default defineConfig({
     // cada serviço é dono dos próprios dados, e o front fala com os dois.
     // Em produção isso seria um gateway ou o mesmo domínio com rotas.
     proxy: {
+      // O ping que tira Payment e Notification da hibernação no ambiente
+      // publicado. Aqui nada hiberna, mas as duas rotas existem pelo mesmo
+      // motivo de sempre: proxy de desenvolvimento que roteia menos serviços
+      // que o publicado esconde o defeito até o deploy.
+      '/wake/payment': {
+        target: process.env.VITE_PAYMENTS_URL ?? 'http://localhost:8082',
+        changeOrigin: true,
+        rewrite: () => '/actuator/health/liveness',
+      },
+      '/wake/notification': {
+        target: process.env.VITE_TICKETS_URL ?? 'http://localhost:8083',
+        changeOrigin: true,
+        rewrite: () => '/actuator/health/liveness',
+      },
       '/api/v1/tickets': {
         target: process.env.VITE_TICKETS_URL ?? 'http://localhost:8083',
         changeOrigin: true,

@@ -26,6 +26,7 @@ import {
 import { forgetGoogleSession } from './lib/google';
 import { navigate, useRoute } from './lib/router';
 import { applyPreference, storedPreference } from './lib/theme';
+import { keepServicesAwake } from './lib/wake';
 import { useOrderStatus } from './useOrderStatus';
 import { Checkout } from './views/Checkout';
 import { Discover } from './views/Discover';
@@ -59,6 +60,10 @@ export default function App() {
   useEffect(() => {
     applyPreference(storedPreference());
   }, []);
+
+  // O Payment e o Notification não recebem HTTP de ninguém até existir pedido, e
+  // hibernam. Abrir o site é o que os acorda a tempo de a compra fechar.
+  useEffect(() => keepServicesAwake(), []);
 
   useEffect(() => {
     listEvents()
