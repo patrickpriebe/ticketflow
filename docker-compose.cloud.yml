@@ -79,7 +79,11 @@ services:
       KAFKA_PASSWORD: ${KAFKA_PASSWORD}
       # `stripe` usa o provedor de verdade; `http` volta para o Wiremock, que
       # continua de pé aqui e permite comparar os dois caminhos sem reconstruir.
-      TICKETFLOW_GATEWAY_PROVIDER: ${TICKETFLOW_GATEWAY_PROVIDER:-stripe}
+      # Padrão é `http`: esta conta Stripe não tem PIX implementado, e o
+      # cabeçalho deste arquivo já promete Wiremock por padrão — o valor
+      # anterior (`stripe`) contradizia isso e quebrava o PIX em silêncio para
+      # quem subisse este compose sem setar a variável.
+      TICKETFLOW_GATEWAY_PROVIDER: ${TICKETFLOW_GATEWAY_PROVIDER:-http}
       TICKETFLOW_GATEWAY_BASE_URL: http://payment-gateway:8080
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       # Do `stripe listen`, que encaminha os webhooks para esta máquina. É outro
